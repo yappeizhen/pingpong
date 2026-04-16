@@ -7,9 +7,9 @@ export interface SwipeState {
   direction: { x: number; y: number }
 }
 
-const HISTORY_SIZE = 5
-const MIN_SWIPE_SPEED = 0.015
-const SMOOTHING = 0.3
+const HISTORY_SIZE = 6
+const MIN_SWIPE_SPEED = 0.025
+const SMOOTHING = 0.4
 
 export class SwipeDetector {
   private positionHistory: Array<{ x: number; y: number; time: number }> = []

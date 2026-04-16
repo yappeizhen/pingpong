@@ -199,28 +199,28 @@ export class BallPhysics {
           this.state.velocity.z ** 2
       )
       
-      // Use paddle swing speed to boost the hit
-      const swingBoost = player === 'player1' ? Math.min(paddle.swipeSpeed * 20, 2.0) : 0.5
-      const baseSpeed = Math.max(incomingSpeed, 2.5)
-      const newSpeed = Math.min(baseSpeed * 1.1 + 0.8 + swingBoost, BALL.MAX_SPEED)
+      // Gentler swing boost - scaled down significantly
+      const swingBoost = player === 'player1' ? Math.min(paddle.swipeSpeed * 8, 0.8) : 0.3
+      const baseSpeed = Math.max(incomingSpeed * 0.9, 2.2)
+      const newSpeed = Math.min(baseSpeed + 0.5 + swingBoost, BALL.MAX_SPEED)
 
-      // Use paddle velocity to influence ball direction
-      const paddleVelInfluence = player === 'player1' ? 0.4 : 0
+      // Reduced paddle velocity influence on direction
+      const paddleVelInfluence = player === 'player1' ? 0.2 : 0
       const swipeX = paddle.velocity.x * paddleVelInfluence
       
       const offsetX = dx / hitZone
       const offsetY = dy / hitZone
 
-      // Ball trajectory influenced by swing direction
+      // Ball trajectory - gentler influence from swing
       this.state.velocity = {
-        x: (offsetX * 0.3 + swipeX * 2) * newSpeed,
-        y: 1.8 + Math.abs(offsetY) * newSpeed * 0.2 + swingBoost * 0.3,
-        z: direction * newSpeed * 0.95,
+        x: (offsetX * 0.25 + swipeX * 0.8) * newSpeed,
+        y: 1.5 + Math.abs(offsetY) * newSpeed * 0.15 + swingBoost * 0.2,
+        z: direction * newSpeed * 0.9,
       }
 
       this.state.spin = {
-        x: (offsetX + swipeX * 3) * 2,
-        y: offsetY * 2,
+        x: (offsetX + swipeX * 2) * 1.5,
+        y: offsetY * 1.5,
       }
 
       this.state.lastHitBy = player
