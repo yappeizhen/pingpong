@@ -67,8 +67,28 @@ export function handToPaddlePosition(
   palm: PalmPosition,
   _hand: HandPrediction
 ): { x: number; y: number } {
+  // Scale factor: larger = more hand movement needed, gentler response
+  // 0.8 means 80% of camera view = 100% of paddle range
+  const SCALE_X = 0.80  // Gentle horizontal scaling
+  const SCALE_Y = 0.70  // Gentle vertical scaling
+  
+  // Center offset: where in camera space maps to paddle center
+  // palm.x/y are 0-1 where 0,0 is top-left of camera feed
+  // Shift CENTER_X to give more room for leftward movement
+  const CENTER_X = 0.55  // Shifted right to give more left room
+  const CENTER_Y = 0.50  // Middle of camera view = paddle center
+  
+  // Map from camera space to paddle space with scaling
+  const rawX = 1 - palm.x // Mirror horizontally
+  const rawY = 1 - palm.y // Invert Y (hand up = paddle up)
+  
+  // Center the mapping
+  const scaledX = 0.5 + (rawX - CENTER_X) / SCALE_X
+  const scaledY = 0.5 + (rawY - (1 - CENTER_Y)) / SCALE_Y
+  
+  // Clamp to valid range
   return {
-    x: 1 - palm.x,
-    y: 1 - palm.y,
+    x: Math.max(0.08, Math.min(0.92, scaledX)),
+    y: Math.max(0.08, Math.min(0.92, scaledY)),
   }
 }

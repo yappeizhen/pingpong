@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { useHandData } from '@/cv'
-import { extractPalmPosition } from '@/cv/palmDetector'
+import { extractPalmPosition, handToPaddlePosition } from '@/cv/palmDetector'
 import { SwipeDetector } from '@/cv/swipeDetector'
 import './HandOverlay.css'
 
@@ -71,8 +71,10 @@ export function HandOverlay({
       const palm = extractPalmPosition(hand)
       const swipe = swipeDetectorRef.current?.update(palm.isOpen ? palm : null) ?? { isSwinging: false, speed: 0 }
       
-      const palmX = (1 - palm.x) * canvas.width
-      const palmY = palm.y * canvas.height
+      // Use scaled paddle position so overlay matches actual game paddle
+      const paddlePos = handToPaddlePosition(palm, hand)
+      const palmX = paddlePos.x * canvas.width
+      const palmY = (1 - paddlePos.y) * canvas.height
 
       const baseSize = Math.min(canvas.width, canvas.height)
       const paddleRadius = baseSize * paddleSize
@@ -129,12 +131,14 @@ export function HandOverlay({
         ctx.lineWidth = 1
         ctx.stroke()
         
-        // Handle
+        // Handle - use raw landmarks for angle calculation
         const wrist = hand.landmarks[0]
+        const rawPalmX = (1 - palm.x) * canvas.width
+        const rawPalmY = palm.y * canvas.height
         const wristX = (1 - wrist.x) * canvas.width
         const wristY = wrist.y * canvas.height
         
-        const angle = Math.atan2(wristY - palmY, wristX - palmX)
+        const angle = Math.atan2(wristY - rawPalmY, wristX - rawPalmX)
         const handleLength = currentRadius * 0.7
         const handleX = palmX + Math.cos(angle) * (currentRadius + handleLength * 0.3)
         const handleY = palmY + Math.sin(angle) * (currentRadius + handleLength * 0.3)

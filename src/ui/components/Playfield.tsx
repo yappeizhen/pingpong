@@ -121,11 +121,15 @@ export function Playfield() {
   }, [phase, setPhase])
 
   const lastPaddlePosRef = useRef({ x: 0.5, y: 0.5 })
+  const lastActiveTimeRef = useRef<number>(0)
+  const lastSwipeRef = useRef({ velocity: { x: 0, y: 0 }, isSwinging: false, speed: 0 })
+  const ACTIVE_GRACE_PERIOD = 300 // Keep paddle active for 300ms after losing tracking
 
   useEffect(() => {
     if (!frame || !gameRef.current || !swipeDetectorRef.current) return
 
     const primaryHand = getPrimaryHand(frame.hands, 'Right')
+    const now = performance.now()
 
     if (primaryHand) {
       const palm = extractPalmPosition(primaryHand)
@@ -133,6 +137,11 @@ export function Playfield() {
       const swipe = swipeDetectorRef.current.update(palm.isOpen ? palm : null)
 
       lastPaddlePosRef.current = paddlePos
+      
+      if (palm.isOpen) {
+        lastActiveTimeRef.current = now
+        lastSwipeRef.current = swipe
+      }
 
       gameRef.current.setPlayer1Paddle({
         position: paddlePos,
@@ -149,12 +158,17 @@ export function Playfield() {
       }
     } else {
       swipeDetectorRef.current.update(null)
+      
+      // Grace period: keep paddle active briefly after losing tracking
+      const timeSinceActive = now - lastActiveTimeRef.current
+      const inGracePeriod = timeSinceActive < ACTIVE_GRACE_PERIOD
+      
       gameRef.current.setPlayer1Paddle({
         position: lastPaddlePosRef.current,
-        velocity: { x: 0, y: 0 },
-        isActive: false,
-        isSwinging: false,
-        swipeSpeed: 0,
+        velocity: inGracePeriod ? lastSwipeRef.current.velocity : { x: 0, y: 0 },
+        isActive: inGracePeriod,
+        isSwinging: inGracePeriod && lastSwipeRef.current.isSwinging,
+        swipeSpeed: inGracePeriod ? lastSwipeRef.current.speed : 0,
         hand: null,
       })
     }

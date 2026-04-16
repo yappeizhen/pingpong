@@ -170,19 +170,26 @@ export class BallPhysics {
     return {}
   }
 
-  private checkPaddleCollision(paddle: PaddleState, player: Player) {
+  private checkPaddleCollision(paddle: PaddleState & { depth?: number }, player: Player) {
     if (!paddle.isActive) return
 
-    const paddleZ = player === 'player1' ? this.tableHalfLength + 0.15 : -this.tableHalfLength - 0.15
+    // AI can move forward/back with depth; player stays at baseline
+    const aiDepthOffset = player === 'player2' && paddle.depth ? paddle.depth * this.tableHalfLength : 0
+    const paddleZ = player === 'player1' 
+      ? this.tableHalfLength + 0.15 
+      : -this.tableHalfLength - 0.15 + aiDepthOffset
     const paddleX = (paddle.position.x - 0.5) * TABLE.WIDTH
-    const paddleY = TABLE.HEIGHT + 0.15 + paddle.position.y * 0.3
+    const paddleY = TABLE.HEIGHT + 0.12 + paddle.position.y * 0.35
 
     const dx = this.state.position.x - paddleX
     const dy = this.state.position.y - paddleY
     const dz = this.state.position.z - paddleZ
 
     const distanceXY = Math.sqrt(dx * dx + dy * dy)
-    const hitZone = PADDLE.HIT_ZONE
+    // AI has slightly larger hit zone when positioned well
+    const hitZone = player === 'player2' ? PADDLE.HIT_ZONE * 1.15 : PADDLE.HIT_ZONE
+    // AI has more depth tolerance since it can position itself
+    const depthTolerance = player === 'player2' ? 0.25 : 0.2
 
     const approachingPaddle =
       (player === 'player1' && this.state.velocity.z > 0) ||
@@ -191,7 +198,7 @@ export class BallPhysics {
     // For player, require swinging motion; AI is always ready
     const canHit = player === 'player2' || paddle.isSwinging
 
-    if (distanceXY < hitZone && Math.abs(dz) < 0.2 && approachingPaddle && canHit) {
+    if (distanceXY < hitZone && Math.abs(dz) < depthTolerance && approachingPaddle && canHit) {
       const direction = player === 'player1' ? -1 : 1
       const incomingSpeed = Math.sqrt(
         this.state.velocity.x ** 2 +
@@ -199,28 +206,34 @@ export class BallPhysics {
           this.state.velocity.z ** 2
       )
       
-      // Gentler swing boost - scaled down significantly
-      const swingBoost = player === 'player1' ? Math.min(paddle.swipeSpeed * 8, 0.8) : 0.3
-      const baseSpeed = Math.max(incomingSpeed * 0.9, 2.2)
-      const newSpeed = Math.min(baseSpeed + 0.5 + swingBoost, BALL.MAX_SPEED)
+      // AI gets better returns based on its swing speed
+      const swingBoost = player === 'player1' 
+        ? Math.min(paddle.swipeSpeed * 8, 0.8) 
+        : Math.min(paddle.swipeSpeed * 6, 1.2)
+      const baseSpeed = Math.max(incomingSpeed * 0.85, 2.4)
+      const newSpeed = Math.min(baseSpeed + 0.6 + swingBoost, BALL.MAX_SPEED)
 
-      // Reduced paddle velocity influence on direction
-      const paddleVelInfluence = player === 'player1' ? 0.2 : 0
-      const swipeX = paddle.velocity.x * paddleVelInfluence
+      // AI uses its velocity to aim returns
+      const paddleVelInfluence = player === 'player1' ? 0.2 : 0.5
+      const aimX = paddle.velocity.x * paddleVelInfluence
       
       const offsetX = dx / hitZone
       const offsetY = dy / hitZone
 
-      // Ball trajectory - gentler influence from swing
+      // AI aims with intention, player uses natural swing
+      const xVelocity = player === 'player2'
+        ? (aimX + offsetX * 0.2) * newSpeed * 0.8
+        : (offsetX * 0.25 + aimX * 0.8) * newSpeed
+
       this.state.velocity = {
-        x: (offsetX * 0.25 + swipeX * 0.8) * newSpeed,
-        y: 1.5 + Math.abs(offsetY) * newSpeed * 0.15 + swingBoost * 0.2,
-        z: direction * newSpeed * 0.9,
+        x: xVelocity,
+        y: 1.6 + Math.abs(offsetY) * newSpeed * 0.12 + swingBoost * 0.15,
+        z: direction * newSpeed * 0.92,
       }
 
       this.state.spin = {
-        x: (offsetX + swipeX * 2) * 1.5,
-        y: offsetY * 1.5,
+        x: (offsetX + aimX * 2) * 1.2,
+        y: offsetY * 1.2,
       }
 
       this.state.lastHitBy = player
@@ -233,33 +246,65 @@ export class BallPhysics {
   private checkOutOfBounds(): { point?: { winner: Player; reason: string } } {
     const { position } = this.state
 
+    // Ball fell below the playing area
     if (position.y < 0) {
-      const winner = position.z > 0 ? 'player2' : 'player1'
+      // If ball bounced on opponent's side first, they missed - hitter wins
+      // Otherwise, hitter hit it off the table
+      const onPlayer1Side = position.z > 0
+      const onPlayer2Side = position.z < 0
+      
+      if (onPlayer2Side && this.bouncedOnPlayerSide.player2) {
+        // Ball bounced on AI's side and fell - AI missed, player1 wins
+        this.state.isInPlay = false
+        return { point: { winner: 'player1', reason: 'miss' } }
+      }
+      if (onPlayer1Side && this.bouncedOnPlayerSide.player1) {
+        // Ball bounced on player1's side and fell - player1 missed, AI wins
+        this.state.isInPlay = false
+        return { point: { winner: 'player2', reason: 'miss' } }
+      }
+      
+      // Ball fell without valid bounce - hitter's fault
+      const winner = this.state.lastHitBy === 'player1' ? 'player2' : 'player1'
       this.state.isInPlay = false
       return { point: { winner, reason: 'out-of-bounds' } }
     }
 
+    // Ball went past the end of the table
     if (Math.abs(position.z) > this.tableHalfLength + 1.5) {
       const missedByPlayer1 = position.z > this.tableHalfLength + 0.5
       const missedByPlayer2 = position.z < -this.tableHalfLength - 0.5
 
-      if (missedByPlayer1 && this.state.lastHitBy === 'player2') {
-        this.state.isInPlay = false
-        return { point: { winner: 'player2', reason: 'miss' } }
+      if (missedByPlayer2) {
+        // Ball went past AI's end
+        if (this.bouncedOnPlayerSide.player2) {
+          // Valid shot that AI missed - player1 wins!
+          this.state.isInPlay = false
+          return { point: { winner: 'player1', reason: 'miss' } }
+        } else {
+          // Player1 hit it long (no bounce on AI's side) - AI wins
+          this.state.isInPlay = false
+          return { point: { winner: 'player2', reason: 'out-of-bounds' } }
+        }
       }
-      if (missedByPlayer2 && this.state.lastHitBy === 'player1') {
-        this.state.isInPlay = false
-        return { point: { winner: 'player1', reason: 'miss' } }
-      }
-
-      if (missedByPlayer1 || missedByPlayer2) {
-        const winner = this.state.lastHitBy === 'player1' ? 'player2' : 'player1'
-        this.state.isInPlay = false
-        return { point: { winner, reason: 'out-of-bounds' } }
+      
+      if (missedByPlayer1) {
+        // Ball went past player1's end
+        if (this.bouncedOnPlayerSide.player1) {
+          // Valid shot that player1 missed - AI wins
+          this.state.isInPlay = false
+          return { point: { winner: 'player2', reason: 'miss' } }
+        } else {
+          // AI hit it long (no bounce on player1's side) - player1 wins
+          this.state.isInPlay = false
+          return { point: { winner: 'player1', reason: 'out-of-bounds' } }
+        }
       }
     }
 
+    // Ball went out sideways
     if (Math.abs(position.x) > this.tableHalfWidth + 1.0) {
+      // Hitter's fault - they hit it wide
       const winner = this.state.lastHitBy === 'player1' ? 'player2' : 'player1'
       this.state.isInPlay = false
       return { point: { winner, reason: 'out-of-bounds' } }
