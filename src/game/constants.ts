@@ -13,7 +13,7 @@ export const TABLE = {
 export const BALL = {
   RADIUS: 0.02,
   MASS: 0.0027,
-  COLOR: 0xff6600,        // Orange ball - stands out against blue table
+  COLOR: 0xffffff,        // White ball - classic ping pong
   INITIAL_SPEED: 2.2,
   MAX_SPEED: 6.0,
   BOUNCE_COEFFICIENT: 0.9,
@@ -41,8 +41,8 @@ export const CAMERA = {
   FOV: 50,
   NEAR: 0.1,
   FAR: 100,
-  POSITION: { x: 0, y: 2.0, z: 2.5 },
-  LOOK_AT: { x: 0, y: TABLE.HEIGHT, z: 0 },
+  POSITION: { x: 0, y: 2.2, z: 3.0 },
+  LOOK_AT: { x: 0, y: TABLE.HEIGHT, z: -0.2 },
 } as const
 
 export const GAME = {

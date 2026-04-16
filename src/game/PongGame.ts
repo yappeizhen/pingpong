@@ -268,7 +268,7 @@ export class PongGame {
     mesh.position.set(x, y, z)
     mesh.rotation.x = player === 'player1' ? -Math.PI / 6 : Math.PI / 6
 
-    const mat = mesh.material as THREE.MeshStandardMaterial
+    const mat = mesh.material as THREE.MeshToonMaterial
     mat.opacity = paddle.isActive ? PADDLE.ACTIVE_OPACITY : PADDLE.INACTIVE_OPACITY
   }
 

@@ -105,7 +105,7 @@ export function HandOverlay({
       if (palm.isOpen) {
         ctx.save()
         
-        // Glow stronger when swinging - yellow theme
+        // Yellow theme - brighter when swinging
         ctx.shadowColor = swipe.isSwinging ? '#ffee00' : color
         ctx.shadowBlur = swipe.isSwinging ? 30 : 15
         
@@ -115,7 +115,7 @@ export function HandOverlay({
         
         ctx.beginPath()
         ctx.arc(palmX, palmY, currentRadius, 0, Math.PI * 2)
-        // Brighter yellow when swinging
+        // Yellow, brighter when swinging
         ctx.fillStyle = swipe.isSwinging ? '#ffee55' : color
         ctx.globalAlpha = 0.9
         ctx.fill()
@@ -165,17 +165,18 @@ export function HandOverlay({
           ctx.fillText('●', palmX, palmY - currentRadius - 8)
         }
       } else {
+        // Dimmed yellow when palm is closed
         trailRef.current = []
         ctx.beginPath()
         ctx.arc(palmX, palmY, paddleRadius, 0, Math.PI * 2)
-        ctx.strokeStyle = 'rgba(100, 100, 120, 0.5)'
+        ctx.strokeStyle = 'rgba(255, 221, 0, 0.5)'
         ctx.lineWidth = 2
         ctx.setLineDash([4, 4])
         ctx.stroke()
         ctx.setLineDash([])
         
         ctx.font = 'bold 16px Inter, sans-serif'
-        ctx.fillStyle = 'rgba(150, 150, 170, 0.7)'
+        ctx.fillStyle = 'rgba(255, 221, 0, 0.7)'
         ctx.textAlign = 'center'
         ctx.fillText('✊', palmX, palmY + 5)
       }
