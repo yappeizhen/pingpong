@@ -139,7 +139,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       phase: 'waiting-for-camera',
       player2: {
         ...initialPlayer2,
-        name: mode === 'multiplayer' ? 'Opponent' : 'AI',
+        name: 'Opponent',
       },
     }),
 }))
