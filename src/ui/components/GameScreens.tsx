@@ -1,12 +1,18 @@
+import { useState } from 'react'
 import { useGameStore } from '@/state'
-import type { GameMode } from '@/types'
+import { MultiplayerMenu } from './MultiplayerMenu'
 import './GameScreens.css'
 
 export function StartScreen() {
   const { startNewGame } = useGameStore()
+  const [showMultiplayer, setShowMultiplayer] = useState(false)
 
-  const handleStart = (mode: GameMode) => {
-    startNewGame(mode)
+  const handleSoloStart = () => {
+    startNewGame('solo')
+  }
+
+  if (showMultiplayer) {
+    return <MultiplayerMenu onBack={() => setShowMultiplayer(false)} />
   }
 
   return (
@@ -20,13 +26,13 @@ export function StartScreen() {
         <p className="tagline">Play ping pong with your hands</p>
 
         <div className="mode-buttons">
-          <button className="mode-button solo" onClick={() => handleStart('solo')}>
+          <button className="mode-button solo" onClick={handleSoloStart}>
             <span className="mode-icon">👤</span>
             <span className="mode-label">Solo</span>
             <span className="mode-desc">Play against AI</span>
           </button>
 
-          <button className="mode-button multiplayer" onClick={() => handleStart('multiplayer')}>
+          <button className="mode-button multiplayer" onClick={() => setShowMultiplayer(true)}>
             <span className="mode-icon">👥</span>
             <span className="mode-label">Multiplayer</span>
             <span className="mode-desc">Challenge a friend</span>

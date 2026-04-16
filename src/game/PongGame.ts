@@ -26,6 +26,9 @@ export class PongGame {
   private player2Paddle: PaddleState = { position: { x: 0.5, y: 0.5 }, velocity: { x: 0, y: 0 }, isActive: true, isSwinging: true, swipeSpeed: 0.5, hand: 'Right' }
 
   private onPoint: PointCallback | null = null
+  
+  private isGuestMode = false
+  private remoteBallState: BallState | null = null
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -259,7 +262,8 @@ export class PongGame {
   }
 
   private updatePaddleMesh(mesh: THREE.Mesh, paddle: PaddleState, player: Player) {
-    mesh.visible = true
+    // Only show opponent's paddle (player2) - player1 uses the 2D overlay instead
+    mesh.visible = player === 'player2'
 
     const x = (paddle.position.x - 0.5) * TABLE.WIDTH
     const y = TABLE.HEIGHT + 0.1 + paddle.position.y * 0.4
@@ -281,6 +285,18 @@ export class PongGame {
   }
 
   setBallState(state: Partial<BallState>) {
+    this.physics.setState(state)
+    if (this.isGuestMode && state.position) {
+      this.remoteBallState = { ...this.physics.getState(), ...state }
+    }
+  }
+
+  setGuestMode(isGuest: boolean) {
+    this.isGuestMode = isGuest
+  }
+
+  setRemoteBallState(state: BallState) {
+    this.remoteBallState = state
     this.physics.setState(state)
   }
 
@@ -330,13 +346,20 @@ export class PongGame {
   }
 
   private update(delta: number) {
-    const result = this.physics.update(delta, this.player1Paddle, this.player2Paddle)
+    let ballState: BallState
 
-    if (result.point && this.onPoint) {
-      this.onPoint(result.point.winner, result.point.reason)
+    if (this.isGuestMode && this.remoteBallState) {
+      ballState = this.remoteBallState
+    } else {
+      const result = this.physics.update(delta, this.player1Paddle, this.player2Paddle)
+
+      if (result.point && this.onPoint) {
+        this.onPoint(result.point.winner, result.point.reason)
+      }
+
+      ballState = this.physics.getState()
     }
 
-    const ballState = this.physics.getState()
     this.ball.position.set(ballState.position.x, ballState.position.y, ballState.position.z)
 
     const shadowY = TABLE.HEIGHT + 0.002
@@ -352,12 +375,13 @@ export class PongGame {
   }
 
   private updateTrajectory(ballState: BallState) {
+    // Trajectory line disabled - was confusing
+    this.trajectoryLine.visible = false
     if (!ballState.isInPlay) {
-      this.trajectoryLine.visible = false
       return
     }
 
-    this.trajectoryLine.visible = true
+    return // Skip trajectory rendering
     const positions = this.trajectoryLine.geometry.attributes.position as THREE.BufferAttribute
 
     let pos = { ...ballState.position }

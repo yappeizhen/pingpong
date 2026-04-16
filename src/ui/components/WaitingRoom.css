@@ -1,0 +1,247 @@
+.waiting-room {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+  color: white;
+  font-family: 'Inter', sans-serif;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.waiting-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  max-width: 400px;
+  width: 100%;
+}
+
+.waiting-icon {
+  font-size: 4rem;
+}
+
+.waiting-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+  color: white;
+}
+
+.waiting-subtitle {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+}
+
+.room-code-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.room-code-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.room-code-box {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  padding: 1rem 1.5rem;
+}
+
+.room-code {
+  font-family: 'Space Grotesk', monospace;
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: 0.3rem;
+  color: #22d3ee;
+}
+
+.copy-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copy-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.room-code-hint {
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.players-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.player-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.player-item.player-ready {
+  border-color: rgba(74, 222, 128, 0.3);
+  background: rgba(74, 222, 128, 0.05);
+}
+
+.player-item.player-waiting {
+  border-style: dashed;
+  background: transparent;
+}
+
+.player-icon {
+  font-size: 1.5rem;
+}
+
+.player-name {
+  flex: 1;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.host-badge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: linear-gradient(135deg, #22d3ee, #a78bfa);
+  color: #0f0f1a;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.player-status {
+  font-size: 0.875rem;
+  color: #4ade80;
+  font-weight: 500;
+}
+
+.waiting-message {
+  font-size: 0.9375rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  margin: 0;
+}
+
+.waiting-actions {
+  width: 100%;
+}
+
+.action-btn {
+  width: 100%;
+  padding: 1rem;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: 'Space Grotesk', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-btn.primary {
+  background: linear-gradient(135deg, #4ade80, #22d3ee);
+  color: #0f0f1a;
+}
+
+.action-btn.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(74, 222, 128, 0.3);
+}
+
+.action-btn.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.action-btn.secondary {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.leave-btn {
+  margin-top: 0.5rem;
+}
+
+.countdown-display {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22d3ee, #a78bfa);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse-countdown 1s ease-in-out infinite;
+}
+
+.countdown-number {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 4rem;
+  font-weight: 700;
+  color: #0f0f1a;
+}
+
+@keyframes pulse-countdown {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@media (max-width: 480px) {
+  .room-code {
+    font-size: 2rem;
+    letter-spacing: 0.2rem;
+  }
+
+  .waiting-title {
+    font-size: 1.75rem;
+  }
+}

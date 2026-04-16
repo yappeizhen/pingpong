@@ -1,0 +1,46 @@
+import { initializeApp, getApps, type FirebaseApp } from 'firebase/app'
+import { getFirestore, type Firestore } from 'firebase/firestore'
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+}
+
+let app: FirebaseApp | null = null
+let db: Firestore | null = null
+
+const isConfigured = (): boolean => {
+  return Boolean(
+    firebaseConfig.apiKey &&
+    firebaseConfig.projectId &&
+    firebaseConfig.apiKey !== 'your-api-key-here'
+  )
+}
+
+export const getFirebaseApp = (): FirebaseApp | null => {
+  if (!isConfigured()) {
+    console.warn('[Firebase] Not configured. Add environment variables to enable multiplayer.')
+    return null
+  }
+  
+  if (!app) {
+    const existingApps = getApps()
+    app = existingApps.length > 0 ? existingApps[0] : initializeApp(firebaseConfig)
+  }
+  return app
+}
+
+export const getDb = (): Firestore | null => {
+  if (!db) {
+    const firebaseApp = getFirebaseApp()
+    if (!firebaseApp) return null
+    db = getFirestore(firebaseApp)
+  }
+  return db
+}
+
+export const isFirebaseEnabled = (): boolean => isConfigured()

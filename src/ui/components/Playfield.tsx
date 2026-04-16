@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
 import { PongGame } from '@/game'
 import { AIController } from '@/game/AIController'
 import { useHandData, extractPalmPosition, getPrimaryHand, handToPaddlePosition, SwipeDetector } from '@/cv'
@@ -216,7 +216,7 @@ export function Playfield() {
     <div className="playfield">
       <video ref={videoRef} className="webcam-feed" playsInline muted />
       <canvas ref={canvasRef} className="game-canvas" />
-      <HandOverlay paddleSize={0.035} paddleColor="#ffdd00" showDebug={true} />
+      <HandOverlay paddleSize={0.035} paddleColor="#ffdd00" showDebug={false} />
       <GameHUD />
       <DebugPanel />
 
@@ -287,5 +287,3 @@ function GameOverOverlay() {
     </div>
   )
 }
-
-import { useState } from 'react'
