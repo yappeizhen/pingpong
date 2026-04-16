@@ -15,70 +15,114 @@
 .hud-scores {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(10px);
-  padding: 0.75rem 2rem;
-  border-radius: 2rem;
-  font-family: 'Space Grotesk', sans-serif;
+  gap: 1rem;
+  background: linear-gradient(135deg, rgba(30, 30, 40, 0.9), rgba(20, 20, 30, 0.95));
+  backdrop-filter: blur(12px);
+  padding: 0.6rem 1.5rem;
+  border-radius: 1rem;
+  font-family: 'Inter', 'Space Grotesk', sans-serif;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .hud-player {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.5rem;
+  transition: background 0.2s ease;
 }
 
+/* Player 1 (You) - Yellow theme */
+.hud-player:not(.opponent) {
+  background: rgba(255, 221, 0, 0.12);
+  border-left: 3px solid #ffdd00;
+}
+
+.hud-player:not(.opponent) .player-name {
+  color: #ffe066;
+}
+
+.hud-player:not(.opponent) .player-score {
+  color: #ffdd00;
+}
+
+.hud-player:not(.opponent).serving {
+  background: rgba(255, 221, 0, 0.22);
+}
+
+.hud-player:not(.opponent) .serve-indicator {
+  color: #ffdd00;
+}
+
+/* Player 2 (Opponent) - Red theme */
 .hud-player.opponent {
   flex-direction: row-reverse;
+  background: rgba(244, 67, 54, 0.15);
+  border-right: 3px solid #f44336;
+}
+
+.hud-player.opponent .player-name {
+  color: #ef9a9a;
+}
+
+.hud-player.opponent .player-score {
+  color: #f44336;
+}
+
+.hud-player.opponent.serving {
+  background: rgba(244, 67, 54, 0.25);
+}
+
+.hud-player.opponent .serve-indicator {
+  color: #f44336;
 }
 
 .player-name {
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
+  font-weight: 500;
 }
 
 .player-score {
-  font-size: 2rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  color: white;
-  min-width: 2.5rem;
+  min-width: 2rem;
   text-align: center;
 }
 
-.hud-player.serving .player-score {
-  color: #4ade80;
-}
-
 .serve-indicator {
-  color: #4ade80;
-  font-size: 0.75rem;
+  font-size: 0.6rem;
   animation: pulse 1s ease-in-out infinite;
 }
 
 .hud-divider {
-  font-size: 1.5rem;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: 1.25rem;
+  color: rgba(255, 255, 255, 0.3);
   font-weight: 300;
+  padding: 0 0.25rem;
 }
 
 .hud-rally {
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.6);
-  background: rgba(0, 0, 0, 0.4);
-  padding: 0.25rem 1rem;
-  border-radius: 1rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.2rem 0.75rem;
+  border-radius: 0.75rem;
+  font-weight: 500;
 }
 
 .hud-message {
-  font-size: 1rem;
-  color: #4ade80;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 0.5rem 1.5rem;
-  border-radius: 1rem;
+  font-size: 0.9rem;
+  color: #ffe066;
+  background: linear-gradient(135deg, rgba(255, 221, 0, 0.15), rgba(255, 221, 0, 0.08));
+  padding: 0.4rem 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 221, 0, 0.25);
   animation: fadeInUp 0.3s ease-out;
+  font-weight: 500;
 }
 
 @keyframes pulse {
@@ -87,7 +131,7 @@
     opacity: 1;
   }
   50% {
-    opacity: 0.5;
+    opacity: 0.4;
   }
 }
 

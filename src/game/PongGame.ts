@@ -94,35 +94,56 @@ export class PongGame {
   private createTable(): THREE.Group {
     const group = new THREE.Group()
 
-    const tableGeo = new THREE.BoxGeometry(TABLE.WIDTH, 0.05, TABLE.LENGTH)
-    const tableMat = new THREE.MeshStandardMaterial({
+    // Main table surface - bright cartoonish blue
+    const tableGeo = new THREE.BoxGeometry(TABLE.WIDTH, 0.08, TABLE.LENGTH)
+    const tableMat = new THREE.MeshToonMaterial({
       color: TABLE.COLOR,
-      roughness: 0.3,
-      metalness: 0.1,
     })
     const tableMesh = new THREE.Mesh(tableGeo, tableMat)
-    tableMesh.position.y = TABLE.HEIGHT - 0.025
+    tableMesh.position.y = TABLE.HEIGHT - 0.04
     tableMesh.receiveShadow = true
     group.add(tableMesh)
 
+    // Table edge trim - darker blue border for cartoon effect
+    const edgeTrimMat = new THREE.MeshToonMaterial({ color: 0x0d47a1 })
+    
+    // Long edge trims
+    const longTrimGeo = new THREE.BoxGeometry(0.04, 0.1, TABLE.LENGTH + 0.04)
+    const leftTrim = new THREE.Mesh(longTrimGeo, edgeTrimMat)
+    leftTrim.position.set(-TABLE.WIDTH / 2 - 0.02, TABLE.HEIGHT - 0.03, 0)
+    group.add(leftTrim)
+    const rightTrim = new THREE.Mesh(longTrimGeo, edgeTrimMat)
+    rightTrim.position.set(TABLE.WIDTH / 2 + 0.02, TABLE.HEIGHT - 0.03, 0)
+    group.add(rightTrim)
+    
+    // Short edge trims
+    const shortTrimGeo = new THREE.BoxGeometry(TABLE.WIDTH + 0.08, 0.1, 0.04)
+    const nearTrim = new THREE.Mesh(shortTrimGeo, edgeTrimMat)
+    nearTrim.position.set(0, TABLE.HEIGHT - 0.03, TABLE.LENGTH / 2 + 0.02)
+    group.add(nearTrim)
+    const farTrim = new THREE.Mesh(shortTrimGeo, edgeTrimMat)
+    farTrim.position.set(0, TABLE.HEIGHT - 0.03, -TABLE.LENGTH / 2 - 0.02)
+    group.add(farTrim)
+
+    // White lines on table
     const lineMat = new THREE.MeshBasicMaterial({ color: TABLE.LINE_COLOR })
 
     const edgeGeoLong = new THREE.BoxGeometry(TABLE.LINE_WIDTH, 0.01, TABLE.LENGTH)
     const leftEdge = new THREE.Mesh(edgeGeoLong, lineMat)
-    leftEdge.position.set(-TABLE.WIDTH / 2 + TABLE.LINE_WIDTH / 2, TABLE.HEIGHT + 0.001, 0)
+    leftEdge.position.set(-TABLE.WIDTH / 2 + TABLE.LINE_WIDTH / 2 + 0.02, TABLE.HEIGHT + 0.001, 0)
     group.add(leftEdge)
 
     const rightEdge = new THREE.Mesh(edgeGeoLong, lineMat)
-    rightEdge.position.set(TABLE.WIDTH / 2 - TABLE.LINE_WIDTH / 2, TABLE.HEIGHT + 0.001, 0)
+    rightEdge.position.set(TABLE.WIDTH / 2 - TABLE.LINE_WIDTH / 2 - 0.02, TABLE.HEIGHT + 0.001, 0)
     group.add(rightEdge)
 
-    const edgeGeoShort = new THREE.BoxGeometry(TABLE.WIDTH, 0.01, TABLE.LINE_WIDTH)
+    const edgeGeoShort = new THREE.BoxGeometry(TABLE.WIDTH - 0.04, 0.01, TABLE.LINE_WIDTH)
     const nearEdge = new THREE.Mesh(edgeGeoShort, lineMat)
-    nearEdge.position.set(0, TABLE.HEIGHT + 0.001, TABLE.LENGTH / 2 - TABLE.LINE_WIDTH / 2)
+    nearEdge.position.set(0, TABLE.HEIGHT + 0.001, TABLE.LENGTH / 2 - TABLE.LINE_WIDTH / 2 - 0.02)
     group.add(nearEdge)
 
     const farEdge = new THREE.Mesh(edgeGeoShort, lineMat)
-    farEdge.position.set(0, TABLE.HEIGHT + 0.001, -TABLE.LENGTH / 2 + TABLE.LINE_WIDTH / 2)
+    farEdge.position.set(0, TABLE.HEIGHT + 0.001, -TABLE.LENGTH / 2 + TABLE.LINE_WIDTH / 2 + 0.02)
     group.add(farEdge)
 
     const centerLineGeo = new THREE.BoxGeometry(TABLE.LINE_WIDTH / 2, 0.01, TABLE.LENGTH)
@@ -130,34 +151,36 @@ export class PongGame {
     centerLine.position.set(0, TABLE.HEIGHT + 0.001, 0)
     group.add(centerLine)
 
-    const netGeo = new THREE.BoxGeometry(TABLE.WIDTH + 0.1, TABLE.NET_HEIGHT, 0.01)
-    const netMat = new THREE.MeshStandardMaterial({
+    // Net - white with slight transparency
+    const netGeo = new THREE.BoxGeometry(TABLE.WIDTH + 0.1, TABLE.NET_HEIGHT, 0.015)
+    const netMat = new THREE.MeshToonMaterial({
       color: 0xffffff,
       transparent: true,
-      opacity: 0.8,
-      roughness: 0.9,
+      opacity: 0.9,
     })
     const net = new THREE.Mesh(netGeo, netMat)
     net.position.set(0, TABLE.HEIGHT + TABLE.NET_HEIGHT / 2, 0)
     group.add(net)
 
-    const netPostGeo = new THREE.CylinderGeometry(0.015, 0.015, TABLE.NET_HEIGHT + 0.05)
-    const netPostMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8 })
+    // Net posts - bright silver/chrome look
+    const netPostGeo = new THREE.CylinderGeometry(0.02, 0.02, TABLE.NET_HEIGHT + 0.06, 16)
+    const netPostMat = new THREE.MeshToonMaterial({ color: 0x90a4ae })
     const leftPost = new THREE.Mesh(netPostGeo, netPostMat)
-    leftPost.position.set(-TABLE.WIDTH / 2 - 0.04, TABLE.HEIGHT + TABLE.NET_HEIGHT / 2, 0)
+    leftPost.position.set(-TABLE.WIDTH / 2 - 0.05, TABLE.HEIGHT + TABLE.NET_HEIGHT / 2, 0)
     group.add(leftPost)
 
     const rightPost = new THREE.Mesh(netPostGeo, netPostMat)
-    rightPost.position.set(TABLE.WIDTH / 2 + 0.04, TABLE.HEIGHT + TABLE.NET_HEIGHT / 2, 0)
+    rightPost.position.set(TABLE.WIDTH / 2 + 0.05, TABLE.HEIGHT + TABLE.NET_HEIGHT / 2, 0)
     group.add(rightPost)
 
-    const legGeo = new THREE.CylinderGeometry(0.03, 0.03, TABLE.HEIGHT - 0.05)
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.5 })
+    // Table legs - cartoonish chunky style
+    const legGeo = new THREE.CylinderGeometry(0.05, 0.06, TABLE.HEIGHT - 0.05, 8)
+    const legMat = new THREE.MeshToonMaterial({ color: 0x37474f })
     const legPositions = [
-      [-TABLE.WIDTH / 2 + 0.1, -TABLE.LENGTH / 2 + 0.1],
-      [TABLE.WIDTH / 2 - 0.1, -TABLE.LENGTH / 2 + 0.1],
-      [-TABLE.WIDTH / 2 + 0.1, TABLE.LENGTH / 2 - 0.1],
-      [TABLE.WIDTH / 2 - 0.1, TABLE.LENGTH / 2 - 0.1],
+      [-TABLE.WIDTH / 2 + 0.1, -TABLE.LENGTH / 2 + 0.15],
+      [TABLE.WIDTH / 2 - 0.1, -TABLE.LENGTH / 2 + 0.15],
+      [-TABLE.WIDTH / 2 + 0.1, TABLE.LENGTH / 2 - 0.15],
+      [TABLE.WIDTH / 2 - 0.1, TABLE.LENGTH / 2 - 0.15],
     ]
     legPositions.forEach(([x, z]) => {
       const leg = new THREE.Mesh(legGeo, legMat)
@@ -171,12 +194,8 @@ export class PongGame {
 
   private createBall(): THREE.Mesh {
     const geo = new THREE.SphereGeometry(BALL.RADIUS, 32, 32)
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshToonMaterial({
       color: BALL.COLOR,
-      roughness: 0.3,
-      metalness: 0.1,
-      emissive: BALL.COLOR,
-      emissiveIntensity: 0.1,
     })
     const mesh = new THREE.Mesh(geo, mat)
     mesh.castShadow = true
@@ -198,13 +217,13 @@ export class PongGame {
   }
 
   private createPaddle(color: number): THREE.Mesh {
+    // Create a paddle group with circle and handle for cartoonish look
     const geo = new THREE.CircleGeometry(PADDLE.RADIUS, 32)
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshToonMaterial({
       color,
       transparent: true,
       opacity: PADDLE.INACTIVE_OPACITY,
       side: THREE.DoubleSide,
-      roughness: 0.5,
     })
     const mesh = new THREE.Mesh(geo, mat)
     mesh.visible = false

@@ -105,23 +105,24 @@ export function HandOverlay({
       if (palm.isOpen) {
         ctx.save()
         
-        // Glow stronger when swinging
-        ctx.shadowColor = swipe.isSwinging ? '#ffffff' : color
-        ctx.shadowBlur = swipe.isSwinging ? 25 : 15
+        // Glow stronger when swinging - yellow theme
+        ctx.shadowColor = swipe.isSwinging ? '#ffee00' : color
+        ctx.shadowBlur = swipe.isSwinging ? 30 : 15
         
         // Paddle grows slightly when swinging
-        const swingScale = swipe.isSwinging ? 1.2 : 1.0
+        const swingScale = swipe.isSwinging ? 1.15 : 1.0
         const currentRadius = paddleRadius * swingScale
         
         ctx.beginPath()
         ctx.arc(palmX, palmY, currentRadius, 0, Math.PI * 2)
-        ctx.fillStyle = swipe.isSwinging ? '#ffff00' : color
+        // Brighter yellow when swinging
+        ctx.fillStyle = swipe.isSwinging ? '#ffee55' : color
         ctx.globalAlpha = 0.9
         ctx.fill()
         
-        ctx.strokeStyle = '#ffffff'
+        ctx.strokeStyle = swipe.isSwinging ? '#ffffff' : 'rgba(255, 255, 255, 0.8)'
         ctx.lineWidth = swipe.isSwinging ? 3 : 2
-        ctx.globalAlpha = 0.9
+        ctx.globalAlpha = 1
         ctx.stroke()
         
         // Inner circle
@@ -156,27 +157,27 @@ export function HandOverlay({
         
         ctx.restore()
 
-        // Show "SWING!" indicator when ready to hit
+        // Show swing indicator when ready to hit
         if (swipe.isSwinging) {
-          ctx.font = 'bold 14px Inter, sans-serif'
-          ctx.fillStyle = '#ffff00'
+          ctx.font = 'bold 12px Inter, sans-serif'
+          ctx.fillStyle = '#ffffff'
           ctx.textAlign = 'center'
-          ctx.fillText('⚡', palmX, palmY - currentRadius - 10)
+          ctx.fillText('●', palmX, palmY - currentRadius - 8)
         }
       } else {
         trailRef.current = []
         ctx.beginPath()
         ctx.arc(palmX, palmY, paddleRadius, 0, Math.PI * 2)
-        ctx.strokeStyle = 'rgba(255, 100, 100, 0.6)'
+        ctx.strokeStyle = 'rgba(100, 100, 120, 0.5)'
         ctx.lineWidth = 2
         ctx.setLineDash([4, 4])
         ctx.stroke()
         ctx.setLineDash([])
         
-        ctx.font = 'bold 10px Inter, sans-serif'
-        ctx.fillStyle = 'rgba(255, 100, 100, 0.8)'
+        ctx.font = 'bold 16px Inter, sans-serif'
+        ctx.fillStyle = 'rgba(150, 150, 170, 0.7)'
         ctx.textAlign = 'center'
-        ctx.fillText('✊', palmX, palmY + 4)
+        ctx.fillText('✊', palmX, palmY + 5)
       }
     })
 

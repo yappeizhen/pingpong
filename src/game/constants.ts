@@ -4,14 +4,16 @@ export const TABLE = {
   HEIGHT: 0.76,
   NET_HEIGHT: 0.1525,
   LINE_WIDTH: 0.02,
-  COLOR: 0x1a5f2a,
+  COLOR: 0x1565c0,        // Darker muted blue
+  SURFACE_COLOR: 0x1976d2, // Medium blue for surface
+  EDGE_COLOR: 0x0d47a1,   // Dark blue for edges
   LINE_COLOR: 0xffffff,
 } as const
 
 export const BALL = {
   RADIUS: 0.02,
   MASS: 0.0027,
-  COLOR: 0xffa500,
+  COLOR: 0xff6600,        // Orange ball - stands out against blue table
   INITIAL_SPEED: 2.2,
   MAX_SPEED: 6.0,
   BOUNCE_COEFFICIENT: 0.9,
@@ -21,8 +23,8 @@ export const BALL = {
 export const PADDLE = {
   RADIUS: 0.10,
   THICKNESS: 0.01,
-  COLOR: 0xff4444,
-  OPPONENT_COLOR: 0x4444ff,
+  COLOR: 0xffdd00,        // Yellow for player 1 (you)
+  OPPONENT_COLOR: 0xf44336, // Red for player 2 (AI)
   HIT_ZONE: 0.18,
   ACTIVE_OPACITY: 0.9,
   INACTIVE_OPACITY: 0.4,
