@@ -1,159 +1,142 @@
 import { create } from 'zustand'
-import type { GameMode, GamePhase, GameState, GestureEvent, SliceEvent } from '@/types'
-import { getPersonalBest, submitScore } from '@/services/leaderboardService'
-import { useUserStore } from './userStore'
-
-const HIGH_SCORE_KEY = 'frootninja_highscore'
-const DEFAULT_ROUND_DURATION = 30
-
-const loadHighScore = (): number => {
-  try {
-    const stored = localStorage.getItem(HIGH_SCORE_KEY)
-    return stored ? parseInt(stored, 10) : 0
-  } catch {
-    return 0
-  }
-}
-
-const saveHighScore = (score: number): void => {
-  try {
-    localStorage.setItem(HIGH_SCORE_KEY, score.toString())
-  } catch {
-    // localStorage not available
-  }
-}
-
-const initialState: GameState = {
-  phase: 'idle',
-  gameMode: 'solo',
-  score: 0,
-  combo: 0,
-  lives: 3,
-  level: 1,
-  activeFruits: [],
-  timeRemaining: DEFAULT_ROUND_DURATION,
-  roundDuration: DEFAULT_ROUND_DURATION,
-  highScore: loadHighScore(),
-  isPlaying: false,
-  challengeTarget: null,
-}
+import type { GameState, GamePhase, GameMode, Player, BallState, PaddleState } from '@/types'
+import { GAME } from '@/game/constants'
 
 interface GameStore extends GameState {
   setPhase: (phase: GamePhase) => void
-  setGameMode: (mode: GameMode) => void
-  setLives: (lives: number) => void
-  registerSlice: (event: SliceEvent) => void
-  registerGesture: (event: GestureEvent) => void
-  resetCombo: () => void
-  setChallengeTarget: (target: number | null) => void
-  setHighScore: (score: number) => void
-  syncHighScore: () => Promise<void>
-  startRound: () => void
-  endRound: () => void
-  tickTimer: () => void
-  reset: () => void
+  setMode: (mode: GameMode) => void
+  setBall: (ball: Partial<BallState>) => void
+  setPlayer1Paddle: (paddle: Partial<PaddleState>) => void
+  setPlayer2Paddle: (paddle: Partial<PaddleState>) => void
+  scorePoint: (winner: Player) => void
+  setServingPlayer: (player: Player) => void
+  incrementRally: () => void
+  resetRally: () => void
+  setSeed: (seed: number) => void
+  resetGame: () => void
+  startNewGame: (mode: GameMode) => void
 }
 
-export const useGameStore = create<GameStore>()((set, get) => ({
-  ...initialState,
-  
-  setPhase: (phase) => set({ phase }),
-  
-  setGameMode: (gameMode) => set({ gameMode }),
-  
-  setLives: (lives) => set({ lives }),
-  
-  registerSlice: (event) =>
-    set((state) => ({
-      score: Math.max(0, state.score + event.scoreDelta),
-      combo: event.scoreDelta > 0 ? state.combo + 1 : 0,
-      recentSlice: event,
-    })),
-  
-  registerGesture: (event) => set({ lastGesture: event }),
-  
-  resetCombo: () => set({ combo: 0 }),
-  
-  setChallengeTarget: (target) => set({ challengeTarget: target }),
-  
-  setHighScore: (score) => {
-    const current = get().highScore
-    if (score > current) {
-      saveHighScore(score)
-      set({ highScore: score })
-    }
-  },
-  
-  syncHighScore: async () => {
-    try {
-      // Fetch personal best from Firebase
-      const firebaseHighScore = await getPersonalBest('solo')
-      const localHighScore = loadHighScore() // Re-read from localStorage to ensure fresh
-      const currentStoreHighScore = get().highScore
-      
-      // Find the maximum across all sources
-      const bestScore = Math.max(firebaseHighScore, localHighScore, currentStoreHighScore)
-      
-      // Update localStorage and store if we found a higher score
-      if (bestScore > 0) {
-        if (bestScore !== localHighScore) {
-          saveHighScore(bestScore)
-        }
-        if (bestScore !== currentStoreHighScore) {
-          set({ highScore: bestScore })
-        }
-      }
-      
-      // If local score is higher than Firebase, submit it to Firebase
-      if (localHighScore > firebaseHighScore && localHighScore > 0) {
-        const username = useUserStore.getState().username
-        if (username) {
-          await submitScore(username, localHighScore, 'solo')
-        }
-      }
-    } catch (error) {
-      console.error('Failed to sync high score:', error)
-    }
-  },
-  
-  startRound: () => set({
-    phase: 'running',
-    isPlaying: true,
+const initialPaddle: PaddleState = {
+  position: { x: 0.5, y: 0.5 },
+  isActive: false,
+  hand: null,
+}
+
+const initialBall: BallState = {
+  position: { x: 0, y: 0.96, z: 0 },
+  velocity: { x: 0, y: 0, z: 0 },
+  spin: { x: 0, y: 0 },
+  lastHitBy: null,
+  isInPlay: false,
+}
+
+const initialPlayer2 = {
+  id: 'player2',
+  name: 'AI',
+  score: 0,
+  paddle: initialPaddle,
+  isServing: false,
+  connected: true,
+}
+
+const getInitialState = (): GameState => ({
+  phase: 'idle',
+  mode: 'solo',
+  ball: initialBall,
+  player1: {
+    id: 'player1',
+    name: 'You',
     score: 0,
-    combo: 0,
-    lives: 3,
-    timeRemaining: get().roundDuration,
-    activeFruits: [],
-    recentSlice: undefined,
-  }),
-  
-  endRound: () => {
+    paddle: initialPaddle,
+    isServing: true,
+    connected: true,
+  },
+  player2: { ...initialPlayer2 },
+  servingPlayer: 'player1',
+  rallyCount: 0,
+  matchPoint: GAME.POINTS_TO_WIN,
+  seed: Date.now(),
+})
+
+export const useGameStore = create<GameStore>((set, get) => ({
+  ...getInitialState(),
+
+  setPhase: (phase) => set({ phase }),
+
+  setMode: (mode) => set({ mode }),
+
+  setBall: (ball) =>
+    set((state) => ({
+      ball: { ...state.ball, ...ball },
+    })),
+
+  setPlayer1Paddle: (paddle) =>
+    set((state) => ({
+      player1: {
+        ...state.player1,
+        paddle: { ...state.player1.paddle, ...paddle },
+      },
+    })),
+
+  setPlayer2Paddle: (paddle) =>
+    set((state) => ({
+      player2: {
+        ...state.player2,
+        paddle: { ...state.player2.paddle, ...paddle },
+      },
+    })),
+
+  scorePoint: (winner) => {
     const state = get()
-    const isNewHighScore = state.score > state.highScore
-    if (isNewHighScore) {
-      saveHighScore(state.score)
-    }
+    const newScore1 = winner === 'player1' ? state.player1.score + 1 : state.player1.score
+    const newScore2 = winner === 'player2' ? state.player2.score + 1 : state.player2.score
+
+    const totalPoints = newScore1 + newScore2
+    const serveSwitch = totalPoints % GAME.SERVE_SWITCH_INTERVAL === 0
+    const newServer = serveSwitch
+      ? state.servingPlayer === 'player1'
+        ? 'player2'
+        : 'player1'
+      : state.servingPlayer
+
+    const gameOver = newScore1 >= GAME.POINTS_TO_WIN || newScore2 >= GAME.POINTS_TO_WIN
+
     set({
-      phase: 'game-over',
-      isPlaying: false,
-      highScore: isNewHighScore ? state.score : state.highScore,
+      player1: { ...state.player1, score: newScore1, isServing: newServer === 'player1' },
+      player2: { ...state.player2, score: newScore2, isServing: newServer === 'player2' },
+      servingPlayer: newServer,
+      rallyCount: 0,
+      phase: gameOver ? 'game-over' : 'point-scored',
     })
   },
-  
-  tickTimer: () => {
-    const state = get()
-    if (!state.isPlaying || state.timeRemaining <= 0) return
-    
-    const newTime = state.timeRemaining - 1
-    if (newTime <= 0) {
-      get().endRound()
-    } else {
-      set({ timeRemaining: newTime })
-    }
-  },
-  
-  reset: () => set({
-    ...initialState,
-    highScore: loadHighScore(),
-  }),
+
+  setServingPlayer: (player) =>
+    set((state) => ({
+      servingPlayer: player,
+      player1: { ...state.player1, isServing: player === 'player1' },
+      player2: { ...state.player2, isServing: player === 'player2' },
+    })),
+
+  incrementRally: () => set((state) => ({ rallyCount: state.rallyCount + 1 })),
+
+  resetRally: () => set({ rallyCount: 0 }),
+
+  setSeed: (seed) => set({ seed }),
+
+  resetGame: () =>
+    set({
+      ...getInitialState(),
+    }),
+
+  startNewGame: (mode) =>
+    set({
+      ...getInitialState(),
+      mode,
+      phase: 'waiting-for-camera',
+      player2: {
+        ...initialPlayer2,
+        name: mode === 'multiplayer' ? 'Opponent' : 'AI',
+      },
+    }),
 }))

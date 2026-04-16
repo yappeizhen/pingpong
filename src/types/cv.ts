@@ -1,20 +1,13 @@
-export type HandTrackingStatus =
-  | 'idle'
-  | 'initializing'
-  | 'ready'
-  | 'permission-denied'
-  | 'error'
-
 export type Handedness = 'Left' | 'Right'
 
-export interface HandLandmark {
+export interface Landmark {
   x: number
   y: number
   z: number
 }
 
 export interface HandPrediction {
-  landmarks: HandLandmark[]
+  landmarks: Landmark[]
   handedness: Handedness
   score: number
 }
@@ -25,9 +18,17 @@ export interface HandFrame {
   fps: number
 }
 
-export interface TrackingDiagnostics {
-  fps: number
-  latencyMs: number
-  droppedFrames: number
-}
+export type HandTrackingStatus =
+  | 'idle'
+  | 'initializing'
+  | 'ready'
+  | 'permission-denied'
+  | 'error'
 
+export interface PalmPosition {
+  x: number
+  y: number
+  z: number
+  isOpen: boolean
+  confidence: number
+}

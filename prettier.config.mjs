@@ -1,10 +1,8 @@
-/** @type {import('prettier').Config} */
-const config = {
+/** @type {import("prettier").Config} */
+export default {
   semi: false,
   singleQuote: true,
-  trailingComma: 'all',
-  arrowParens: 'always',
+  trailingComma: 'es5',
+  tabWidth: 2,
+  printWidth: 100,
 }
-
-export default config
-

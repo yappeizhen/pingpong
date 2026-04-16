@@ -1,16 +1,4 @@
 import { createContext } from 'react'
-import type { HandFrame, HandTrackingStatus } from '@/types'
+import type { HandTracker } from './handTracker'
 
-export interface HandTrackerContextValue {
-  status: HandTrackingStatus
-  frame: HandFrame | null
-  videoRef: (node: HTMLVideoElement | null) => void
-  error: string | null
-  restart: () => Promise<void>
-  maxHands: number
-}
-
-export const HandTrackerContext = createContext<HandTrackerContextValue | undefined>(
-  undefined,
-)
-
+export const HandTrackerContext = createContext<HandTracker | null>(null)

@@ -1,201 +1,257 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useHandData } from '@/cv'
-import { useGameStore } from '@/state/gameStore'
-import { useMultiplayerStore } from '@/state/multiplayerStore'
-import { useInputModeStore } from '@/state/inputModeStore'
-import { FruitLayer } from '@/ui/components/FruitCanvas'
-import { StartScreen, GameOverScreen } from '@/ui/components/GameScreens'
-import { ChallengeBanner } from '@/ui/components/ChallengeBanner'
-import { LoadingScreen } from '@/ui/components/LoadingScreen'
+import { useRef, useEffect, useCallback } from 'react'
+import { PongGame } from '@/game'
+import { useHandData, extractPalmPosition, getPrimaryHand, handToPaddlePosition } from '@/cv'
+import { useGameStore } from '@/state'
+import { DebugPanel } from './DebugPanel'
+import { GameHUD } from './GameHUD'
+import { HandOverlay } from './HandOverlay'
+import './Playfield.css'
 
-const STATUS_COPY: Record<string, string> = {
-  idle: 'Waiting for camera...',
-  initializing: 'Loading MediaPipe Hands...',
-  ready: 'Tracking active',
-  'permission-denied': 'Camera permission denied',
-  error: 'Tracking error - check console',
-}
+export function Playfield() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const gameRef = useRef<PongGame | null>(null)
+  const serveTimeoutRef = useRef<number | null>(null)
 
-export const Playfield = () => {
-  const { frame, status, error, videoRef, restart } = useHandData()
-  const [localVideo, setLocalVideo] = useState<HTMLVideoElement | null>(null)
-  const { phase, isPlaying, score, highScore, challengeTarget, setChallengeTarget, syncHighScore, startRound, tickTimer, reset } = useGameStore()
-  const { roomId, roomState } = useMultiplayerStore()
-  const { inputMode } = useInputModeStore()
-  const timerRef = useRef<number | null>(null)
-  const [prevHighScore, setPrevHighScore] = useState(highScore)
+  const { frame, status, startTracking, stopTracking } = useHandData()
 
-  const handsDetected = frame?.hands.length ?? 0
-  const isFallbackMode = inputMode === 'fallback'
-  
-  // Check if multiplayer is active (in a room and game is in progress)
-  const isMultiplayerActive = roomId && (roomState === 'countdown' || roomState === 'playing' || roomState === 'finished')
+  const {
+    phase,
+    servingPlayer,
+    seed,
+    setPhase,
+    setPlayer2Paddle,
+    scorePoint,
+  } = useGameStore()
 
-  // Sync high score with Firebase on mount
   useEffect(() => {
-    syncHighScore()
-  }, [syncHighScore])
+    if (!canvasRef.current) return
 
-  // Detect challenge parameter from URL on mount
+    const game = new PongGame(canvasRef.current)
+    gameRef.current = game
+
+    game.setOnPoint((winner, reason) => {
+      console.log(`Point for ${winner}: ${reason}`)
+      scorePoint(winner)
+    })
+
+    game.start()
+
+    return () => {
+      game.dispose()
+      gameRef.current = null
+    }
+  }, [scorePoint])
+
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const challengeParam = params.get('challenge')
-    
-    if (challengeParam) {
-      const target = parseInt(challengeParam, 10)
-      if (!isNaN(target) && target > 0 && target <= 10000) {
-        setChallengeTarget(target)
-        // Clean up URL without reloading
-        const newUrl = window.location.pathname
-        window.history.replaceState({}, '', newUrl)
+    console.log('[Playfield] Camera effect - phase:', phase, 'status:', status, 'videoRef:', !!videoRef.current)
+    if (phase === 'waiting-for-camera' && status === 'idle') {
+      if (videoRef.current) {
+        console.log('[Playfield] Starting hand tracking...')
+        startTracking(videoRef.current).catch((err) => {
+          console.error('[Playfield] Failed to start tracking:', err)
+        })
+      } else {
+        console.warn('[Playfield] videoRef is null!')
       }
     }
-  }, [setChallengeTarget])
-
-  const handleVideoRef = useCallback(
-    (node: HTMLVideoElement | null) => {
-      videoRef(node)
-      setLocalVideo(node)
-    },
-    [videoRef],
-  )
+  }, [phase, status, startTracking])
 
   useEffect(() => {
-    if (!localVideo) return
-    const updateSize = () => {
-      // no-op placeholder if future sizing logic needed
+    if (phase === 'waiting-for-camera' && status === 'ready') {
+      setPhase('ready')
     }
-    localVideo.addEventListener('loadedmetadata', updateSize)
-    return () => {
-      localVideo.removeEventListener('loadedmetadata', updateSize)
-    }
-  }, [localVideo])
+  }, [phase, status, setPhase])
 
-  // Timer tick effect
   useEffect(() => {
-    if (isPlaying) {
-      timerRef.current = window.setInterval(() => {
-        tickTimer()
+    if (phase === 'ready') {
+      const timer = setTimeout(() => {
+        setPhase('countdown')
       }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [phase, setPhase])
+
+  useEffect(() => {
+    if (phase === 'countdown') {
+      const timer = setTimeout(() => {
+        setPhase('serving')
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [phase, setPhase])
+
+  const handleServe = useCallback(() => {
+    if (phase !== 'serving' || servingPlayer !== 'player1') return
+    if (serveTimeoutRef.current) return
+
+    gameRef.current?.serve('player1', seed)
+    setPhase('playing')
+
+    serveTimeoutRef.current = window.setTimeout(() => {
+      serveTimeoutRef.current = null
+    }, 500)
+  }, [phase, servingPlayer, seed, setPhase])
+
+  useEffect(() => {
+    if (phase === 'serving' && servingPlayer === 'player2') {
+      const timer = setTimeout(() => {
+        gameRef.current?.serve('player2', seed + 1)
+        setPhase('playing')
+      }, 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [phase, servingPlayer, seed, setPhase])
+
+  useEffect(() => {
+    if (phase === 'point-scored') {
+      gameRef.current?.reset()
+      const timer = setTimeout(() => {
+        setPhase('serving')
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [phase, setPhase])
+
+  const lastPaddlePosRef = useRef({ x: 0.5, y: 0.5 })
+
+  useEffect(() => {
+    if (!frame || !gameRef.current) return
+
+    const primaryHand = getPrimaryHand(frame.hands, 'Right')
+
+    if (primaryHand) {
+      const palm = extractPalmPosition(primaryHand)
+      const paddlePos = handToPaddlePosition(palm, primaryHand)
+
+      lastPaddlePosRef.current = paddlePos
+
+      gameRef.current.setPlayer1Paddle({
+        position: paddlePos,
+        isActive: palm.isOpen,
+        hand: primaryHand.handedness,
+      })
+
+      if (phase === 'serving' && servingPlayer === 'player1' && palm.isOpen) {
+        handleServe()
+      }
     } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
+      gameRef.current.setPlayer1Paddle({
+        position: lastPaddlePosRef.current,
+        isActive: false,
+        hand: null,
+      })
     }
+  }, [frame, phase, servingPlayer, handleServe])
+
+  useEffect(() => {
+    if (phase !== 'playing' || !gameRef.current) return
+
+    const ballState = gameRef.current.getBallState()
+    if (!ballState.isInPlay) return
+
+    const ballX = ballState.position.x
+    const tableHalfWidth = 0.7625
+
+    const targetX = 0.5 + (ballX / tableHalfWidth) * 0.3 + (Math.random() - 0.5) * 0.1
+    const targetY = 0.4 + Math.random() * 0.2
+
+    setPlayer2Paddle({
+      position: { x: Math.max(0.2, Math.min(0.8, targetX)), y: targetY },
+      isActive: true,
+      hand: 'Right',
+    })
+
+    gameRef.current.setPlayer2Paddle({
+      position: { x: Math.max(0.2, Math.min(0.8, targetX)), y: targetY },
+      isActive: true,
+      hand: 'Right',
+    })
+  }, [phase, setPlayer2Paddle])
+
+  useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
+      stopTracking()
+      if (serveTimeoutRef.current) {
+        clearTimeout(serveTimeoutRef.current)
       }
     }
-  }, [isPlaying, tickTimer])
-
-  const handleStart = useCallback(() => {
-    setPrevHighScore(highScore)
-    startRound()
-  }, [startRound, highScore])
-
-  const handleRestart = useCallback(() => {
-    setPrevHighScore(highScore)
-    reset()
-    startRound()
-  }, [reset, startRound, highScore])
-
-  const handleBackToMenu = useCallback(() => {
-    reset()
-  }, [reset])
-
-  const isNewHighScore = phase === 'game-over' && score > prevHighScore
-
-  const banner = useMemo(() => {
-    // In fallback mode, don't show camera-related banners
-    if (isFallbackMode) {
-      return null
-    }
-    if (error) {
-      return {
-        tone: 'warning' as const,
-        message: error,
-        action: 'Retry',
-      }
-    }
-    if (status !== 'ready') {
-      return {
-        tone: 'muted' as const,
-        message: STATUS_COPY[status] ?? 'Initializing...',
-      }
-    }
-    if (handsDetected === 0 && phase === 'idle') {
-      return {
-        tone: 'info' as const,
-        message: 'Show your hand to verify tracking',
-      }
-    }
-    return null
-  }, [status, error, handsDetected, phase, isFallbackMode])
-
-  // Don't render solo playfield content when multiplayer is active
-  if (isMultiplayerActive) {
-    return null
-  }
+  }, [stopTracking])
 
   return (
-    <section className={`playfield-stage ${isFallbackMode ? 'playfield-stage--fallback' : ''}`}>
-        {/* Only show video when using camera mode */}
-        {!isFallbackMode && (
-          <video
-            ref={handleVideoRef}
-            className="playfield-video"
-            autoPlay
-            muted
-            playsInline
-          />
-        )}
-        
-        {/* Show gradient background in fallback mode */}
-        {isFallbackMode && <div className="playfield-fallback-bg" />}
-        
-        <FruitLayer />
-        
-        {/* Challenge banner during gameplay */}
-        {phase === 'running' && challengeTarget !== null && (
-          <ChallengeBanner />
-        )}
-        
-        {/* Back to Menu button during gameplay */}
-        {phase === 'running' && (
-          <button 
-            className="game-menu-btn"
-            onClick={handleBackToMenu}
-            aria-label="Back to menu"
-          >
-            ✕
-          </button>
-        )}
-        
-        {/* Loading screen overlay - skip in fallback mode */}
-        {status !== 'ready' && !isFallbackMode && (
-          <LoadingScreen status={status} error={error} onRetry={restart} />
-        )}
-        
-        {/* Game screens overlay - show in fallback mode even if camera not ready */}
-        {phase === 'idle' && (status === 'ready' || isFallbackMode) && (
-          <StartScreen onStart={handleStart} />
-        )}
-        {phase === 'game-over' && (
-          <GameOverScreen onRestart={handleRestart} onChangeMode={handleBackToMenu} isNewHighScore={isNewHighScore} />
-        )}
-        
-        {banner && phase !== 'idle' ? (
-          <div className={`playfield-banner playfield-banner--${banner.tone}`}>
-            <span>{banner.message}</span>
-            {banner.action ? (
-              <button type="button" onClick={restart}>
-                {banner.action}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-    </section>
+    <div className="playfield">
+      <video ref={videoRef} className="webcam-feed" playsInline muted />
+      <canvas ref={canvasRef} className="game-canvas" />
+      <HandOverlay showLandmarks={true} showPaddle={true} />
+      <GameHUD />
+      <DebugPanel />
+
+      {phase === 'countdown' && <CountdownOverlay />}
+      {phase === 'point-scored' && <PointScoredOverlay />}
+      {phase === 'game-over' && <GameOverOverlay />}
+
+      {status === 'initializing' && (
+        <div className="loading-overlay">
+          <div className="loading-spinner" />
+          <p>Initializing camera...</p>
+        </div>
+      )}
+
+      {status === 'permission-denied' && (
+        <div className="error-overlay">
+          <p>Camera access denied</p>
+          <p className="error-hint">Please allow camera access to play</p>
+        </div>
+      )}
+    </div>
   )
 }
+
+function CountdownOverlay() {
+  const [count, setCount] = useState(3)
+
+  useEffect(() => {
+    if (count > 0) {
+      const timer = setTimeout(() => setCount(count - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [count])
+
+  return (
+    <div className="countdown-overlay">
+      <span className="countdown-number">{count > 0 ? count : 'GO!'}</span>
+    </div>
+  )
+}
+
+function PointScoredOverlay() {
+  const { player1, player2 } = useGameStore()
+  const lastScorer = player1.score > player2.score ? player1 : player2
+
+  return (
+    <div className="point-overlay">
+      <span className="point-text">Point!</span>
+      <span className="point-scorer">{lastScorer.name}</span>
+    </div>
+  )
+}
+
+function GameOverOverlay() {
+  const { player1, player2, resetGame } = useGameStore()
+  const winner = player1.score > player2.score ? player1 : player2
+
+  return (
+    <div className="gameover-overlay">
+      <h2 className="gameover-title">Game Over</h2>
+      <p className="gameover-winner">{winner.name} wins!</p>
+      <p className="gameover-score">
+        {player1.score} - {player2.score}
+      </p>
+      <button className="gameover-button" onClick={resetGame}>
+        Play Again
+      </button>
+    </div>
+  )
+}
+
+import { useState } from 'react'

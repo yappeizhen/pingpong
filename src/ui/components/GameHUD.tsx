@@ -1,81 +1,34 @@
-import { useGameStore } from '@/state/gameStore'
+import { useGameStore } from '@/state'
+import './GameHUD.css'
 
-const formatTime = (seconds: number): string => {
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
+export function GameHUD() {
+  const { player1, player2, servingPlayer, rallyCount, phase } = useGameStore()
 
-interface GameHUDProps {
-  bombHit?: boolean
-  pointsDocked?: boolean
-}
-
-export const GameHUD = ({ bombHit = false, pointsDocked = false }: GameHUDProps) => {
-  const { score, combo, lives, timeRemaining, roundDuration, highScore } = useGameStore()
-  
-  const timerProgress = (timeRemaining / roundDuration) * 100
-  const isLowTime = timeRemaining <= 10
-  
   return (
     <div className="game-hud">
-      {/* Timer */}
-      <div className={`hud-timer ${isLowTime ? 'hud-timer--urgent' : ''}`}>
-        <svg className="hud-timer__ring" viewBox="0 0 100 100">
-          <circle
-            className="hud-timer__track"
-            cx="50"
-            cy="50"
-            r="45"
-            fill="none"
-            strokeWidth="6"
-          />
-          <circle
-            className="hud-timer__progress"
-            cx="50"
-            cy="50"
-            r="45"
-            fill="none"
-            strokeWidth="6"
-            strokeDasharray={`${timerProgress * 2.83} 283`}
-            strokeLinecap="round"
-            transform="rotate(-90 50 50)"
-          />
-        </svg>
-        <span className="hud-timer__value">{formatTime(timeRemaining)}</span>
+      <div className="hud-scores">
+        <div className={`hud-player ${servingPlayer === 'player1' ? 'serving' : ''}`}>
+          <span className="player-name">{player1.name}</span>
+          <span className="player-score">{player1.score}</span>
+          {servingPlayer === 'player1' && <span className="serve-indicator">●</span>}
+        </div>
+
+        <div className="hud-divider">-</div>
+
+        <div className={`hud-player opponent ${servingPlayer === 'player2' ? 'serving' : ''}`}>
+          <span className="player-name">{player2.name}</span>
+          <span className="player-score">{player2.score}</span>
+          {servingPlayer === 'player2' && <span className="serve-indicator">●</span>}
+        </div>
       </div>
 
-      {/* Score */}
-      <div className="hud-score">
-        <span className="hud-score__label">Score</span>
-        <span className={`hud-score__value ${pointsDocked ? 'hud-score__value--docked' : ''}`}>
-          {score.toLocaleString()}
-        </span>
-        {combo > 1 && (
-          <span className="hud-score__combo">x{combo}</span>
-        )}
-        {pointsDocked && (
-          <span className="hud-score__dock-indicator">-10</span>
-        )}
-      </div>
+      {phase === 'playing' && rallyCount > 0 && (
+        <div className="hud-rally">Rally: {rallyCount}</div>
+      )}
 
-      {/* Lives */}
-      <div className={`hud-lives ${bombHit ? 'hud-lives--hit' : ''}`}>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <span
-            key={i}
-            className={`hud-lives__heart ${i < lives ? 'hud-lives__heart--active' : ''} ${bombHit && i === lives ? 'hud-lives__heart--lost' : ''}`}
-          >
-            {i < lives ? '❤️' : '🩶'}
-          </span>
-        ))}
-      </div>
-
-      {/* High Score Badge */}
-      {highScore > 0 && (
-        <div className="hud-highscore">
-          <span className="hud-highscore__label">Best</span>
-          <span className="hud-highscore__value">{highScore.toLocaleString()}</span>
+      {phase === 'serving' && (
+        <div className="hud-message">
+          {servingPlayer === 'player1' ? 'Your serve - Open palm to serve!' : 'Opponent serving...'}
         </div>
       )}
     </div>

@@ -1,9 +1,5 @@
 import type { HandFrame, HandPrediction, HandTrackingStatus } from '@/types'
-import {
-  FilesetResolver,
-  HandLandmarker,
-  type HandLandmarkerResult,
-} from '@mediapipe/tasks-vision'
+import { FilesetResolver, HandLandmarker, type HandLandmarkerResult } from '@mediapipe/tasks-vision'
 
 const MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'
@@ -26,7 +22,7 @@ export interface HandTracker {
 }
 
 export const createHandTracker = (options: TrackerOptions = {}): HandTracker => {
-  const maxHands = options.maxHands ?? 1
+  const maxHands = options.maxHands ?? 2
   let landmarker: HandLandmarker | undefined
   let videoEl: HTMLVideoElement | undefined
   let mediaStream: MediaStream | undefined
@@ -62,13 +58,12 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
   const convertResultToFrame = (
     result: HandLandmarkerResult,
     timestamp: number,
-    fps: number,
+    fps: number
   ): HandFrame => {
     const hands: HandPrediction[] =
       result.handednesses?.map((handedness, index) => {
         const category = handedness[0]
-        const handednessLabel =
-          category?.categoryName === 'Left' ? 'Left' : 'Right'
+        const handednessLabel = category?.categoryName === 'Left' ? 'Left' : 'Right'
 
         const landmarks =
           result.landmarks?.[index]?.map((landmark) => ({
@@ -84,12 +79,11 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
         }
       }) ?? []
 
-    return {
-      hands,
-      timestamp,
-      fps,
-    }
+    return { hands, timestamp, fps }
   }
+
+  let lastHandCount = 0
+  let frameCount = 0
 
   const detectionLoop = () => {
     if (!videoEl || !landmarker) {
@@ -106,7 +100,18 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
       const frameDelta = now - lastFrameTimestamp
       const fps = Number.isFinite(frameDelta) && frameDelta > 0 ? 1000 / frameDelta : 0
       lastFrameTimestamp = now
-      emitFrame(convertResultToFrame(result, now, fps))
+      const frame = convertResultToFrame(result, now, fps)
+      
+      frameCount++
+      if (frame.hands.length !== lastHandCount) {
+        console.log('[handTracker] Hands changed:', lastHandCount, '->', frame.hands.length)
+        lastHandCount = frame.hands.length
+      }
+      if (frameCount % 60 === 0) {
+        console.log('[handTracker] Detection running, fps:', Math.round(fps), 'hands:', frame.hands.length)
+      }
+      
+      emitFrame(frame)
     }
 
     rafId = requestAnimationFrame(detectionLoop)
@@ -114,52 +119,55 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
 
   const ensureLandmarker = async () => {
     if (landmarker) return landmarker
+    console.log('[handTracker] Loading MediaPipe model...')
     const filesetResolver = await FilesetResolver.forVisionTasks(WASM_FILES_URL)
     landmarker = await HandLandmarker.createFromOptions(filesetResolver, {
-      baseOptions: {
-        modelAssetPath: MODEL_URL,
-      },
+      baseOptions: { modelAssetPath: MODEL_URL },
       runningMode: 'VIDEO',
       numHands: maxHands,
     })
+    console.log('[handTracker] Model loaded successfully')
     return landmarker
   }
 
   const attachCamera = async (video: HTMLVideoElement) => {
     cleanupStream()
     videoEl = video
+    console.log('[handTracker] Requesting camera access...')
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         width: { ideal: 1280 },
         height: { ideal: 720 },
         frameRate: { ideal: 60 },
+        facingMode: 'user',
       },
     })
+    console.log('[handTracker] Camera access granted')
     mediaStream = stream
     video.srcObject = stream
     video.playsInline = true
     video.muted = true
     await video.play()
+    console.log('[handTracker] Video playing, dimensions:', video.videoWidth, 'x', video.videoHeight)
   }
 
   let isStarting = false
 
   const start = async (video: HTMLVideoElement) => {
-    // Prevent concurrent start attempts
+    console.log('[handTracker] start() called, isStarting:', isStarting, 'status:', status)
     if (isStarting) {
+      console.log('[handTracker] Already starting, returning')
       return
     }
-
-    // If already ready with the SAME video element, do nothing
     if (status === 'ready' && videoEl === video) {
+      console.log('[handTracker] Already ready with same video, returning')
       return
     }
 
-    // If already ready but with a different video element, re-attach camera
     if (status === 'ready' && videoEl !== video) {
+      console.log('[handTracker] Ready but different video, re-attaching...')
       isStarting = true
       try {
-        // Reuse existing stream if available
         if (mediaStream && mediaStream.active) {
           video.srcObject = mediaStream
           video.playsInline = true
@@ -178,7 +186,8 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
       }
       return
     }
-    
+
+    console.log('[handTracker] Starting fresh initialization...')
     isStarting = true
     notifyStatus('initializing')
     try {
@@ -187,12 +196,14 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
       notifyStatus('ready')
       lastVideoTime = -1
       stopLoop()
+      console.log('[handTracker] Starting detection loop')
       rafId = requestAnimationFrame(detectionLoop)
     } catch (error) {
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        console.error('[handTracker] Camera permission denied')
         notifyStatus('permission-denied')
       } else {
-        console.error('Hand tracker init failed', error)
+        console.error('[handTracker] Init failed:', error)
         notifyStatus('error')
       }
       cleanupStream()
@@ -227,4 +238,3 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
     getStatus: () => status,
   }
 }
-
