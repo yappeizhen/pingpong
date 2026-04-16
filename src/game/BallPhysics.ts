@@ -30,19 +30,29 @@ export class BallPhysics {
   }
 
   serve(player: Player, seed: number) {
-    const direction = player === 'player1' ? 1 : -1
     const seededRandom = this.seededRandom(seed)
+    
+    // Player 1 is at +z (near camera), Player 2 (AI) is at -z (far side)
+    // When player1 serves: start at +z, velocity goes to -z (towards AI)
+    // When player2 serves: start at -z, velocity goes to +z (towards player1)
+    const startZ = player === 'player1' 
+      ? this.tableHalfLength * 0.6   // Near player 1 (positive z)
+      : -this.tableHalfLength * 0.6  // Near player 2/AI (negative z)
+    
+    const velocityZ = player === 'player1'
+      ? -(BALL.INITIAL_SPEED + seededRandom() * 0.5)  // Towards AI (negative)
+      : (BALL.INITIAL_SPEED + seededRandom() * 0.5)   // Towards player1 (positive)
 
     this.state = {
       position: {
         x: (seededRandom() - 0.5) * 0.3,
-        y: TABLE.HEIGHT + 0.3,
-        z: direction * (this.tableHalfLength - 0.3),
+        y: TABLE.HEIGHT + 0.25,
+        z: startZ,
       },
       velocity: {
-        x: (seededRandom() - 0.5) * 1.0,
-        y: seededRandom() * 1.5 + 2.0,
-        z: -direction * (BALL.INITIAL_SPEED + seededRandom() * 1.0),
+        x: (seededRandom() - 0.5) * 0.5,
+        y: 1.5 + seededRandom() * 0.5,
+        z: velocityZ,
       },
       spin: { x: 0, y: 0 },
       lastHitBy: player,
@@ -50,6 +60,13 @@ export class BallPhysics {
     }
 
     this.bouncedOnPlayerSide = { player1: false, player2: false }
+    
+    console.log(`[Physics] ${player} served:`, {
+      startZ: startZ.toFixed(2),
+      velocityZ: velocityZ.toFixed(2),
+      position: this.state.position,
+      velocity: this.state.velocity
+    })
   }
 
   update(
@@ -156,9 +173,9 @@ export class BallPhysics {
   private checkPaddleCollision(paddle: PaddleState, player: Player) {
     if (!paddle.isActive) return
 
-    const paddleZ = player === 'player1' ? this.tableHalfLength + 0.1 : -this.tableHalfLength - 0.1
+    const paddleZ = player === 'player1' ? this.tableHalfLength + 0.15 : -this.tableHalfLength - 0.15
     const paddleX = (paddle.position.x - 0.5) * TABLE.WIDTH
-    const paddleY = TABLE.HEIGHT + 0.1 + paddle.position.y * 0.4
+    const paddleY = TABLE.HEIGHT + 0.15 + paddle.position.y * 0.3
 
     const dx = this.state.position.x - paddleX
     const dy = this.state.position.y - paddleY
@@ -171,31 +188,33 @@ export class BallPhysics {
       (player === 'player1' && this.state.velocity.z > 0) ||
       (player === 'player2' && this.state.velocity.z < 0)
 
-    if (distanceXY < hitZone && Math.abs(dz) < 0.15 && approachingPaddle) {
+    if (distanceXY < hitZone && Math.abs(dz) < 0.35 && approachingPaddle) {
       const direction = player === 'player1' ? -1 : 1
       const speed = Math.sqrt(
         this.state.velocity.x ** 2 +
           this.state.velocity.y ** 2 +
           this.state.velocity.z ** 2
       )
-      const newSpeed = Math.min(speed * 1.1, BALL.MAX_SPEED)
+      const newSpeed = Math.min(speed * 1.05 + 0.5, BALL.MAX_SPEED)
 
       const offsetX = dx / hitZone
       const offsetY = dy / hitZone
 
       this.state.velocity = {
-        x: offsetX * newSpeed * 0.5,
-        y: Math.abs(this.state.velocity.y) * 0.8 + offsetY * newSpeed * 0.3,
-        z: direction * newSpeed * 0.8,
+        x: offsetX * newSpeed * 0.4,
+        y: 1.0 + Math.abs(offsetY) * newSpeed * 0.3,
+        z: direction * newSpeed * 0.85,
       }
 
       this.state.spin = {
-        x: offsetX * 5,
-        y: offsetY * 5,
+        x: offsetX * 3,
+        y: offsetY * 3,
       }
 
       this.state.lastHitBy = player
       this.bouncedOnPlayerSide = { player1: false, player2: false }
+      
+      console.log(`[Physics] ${player} hit ball, new velocity:`, this.state.velocity)
     }
   }
 

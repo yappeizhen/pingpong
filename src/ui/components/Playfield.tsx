@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { PongGame } from '@/game'
+import { AIController } from '@/game/AIController'
 import { useHandData, extractPalmPosition, getPrimaryHand, handToPaddlePosition } from '@/cv'
 import { useGameStore } from '@/state'
 import { DebugPanel } from './DebugPanel'
@@ -11,7 +12,9 @@ export function Playfield() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const gameRef = useRef<PongGame | null>(null)
+  const aiRef = useRef<AIController | null>(null)
   const serveTimeoutRef = useRef<number | null>(null)
+  const lastAiUpdateRef = useRef<number>(0)
 
   const { frame, status, startTracking, stopTracking } = useHandData()
 
@@ -20,7 +23,6 @@ export function Playfield() {
     servingPlayer,
     seed,
     setPhase,
-    setPlayer2Paddle,
     scorePoint,
   } = useGameStore()
 
@@ -29,6 +31,7 @@ export function Playfield() {
 
     const game = new PongGame(canvasRef.current)
     gameRef.current = game
+    aiRef.current = new AIController('medium')
 
     game.setOnPoint((winner, reason) => {
       console.log(`Point for ${winner}: ${reason}`)
@@ -40,6 +43,7 @@ export function Playfield() {
     return () => {
       game.dispose()
       gameRef.current = null
+      aiRef.current = null
     }
   }, [scorePoint])
 
@@ -145,29 +149,33 @@ export function Playfield() {
   }, [frame, phase, servingPlayer, handleServe])
 
   useEffect(() => {
-    if (phase !== 'playing' || !gameRef.current) return
+    if (phase !== 'playing' && phase !== 'serving') return
+    if (!gameRef.current || !aiRef.current) return
 
-    const ballState = gameRef.current.getBallState()
-    if (!ballState.isInPlay) return
+    let animationId: number
 
-    const ballX = ballState.position.x
-    const tableHalfWidth = 0.7625
+    const updateAI = () => {
+      if (!gameRef.current || !aiRef.current) return
 
-    const targetX = 0.5 + (ballX / tableHalfWidth) * 0.3 + (Math.random() - 0.5) * 0.1
-    const targetY = 0.4 + Math.random() * 0.2
+      const now = performance.now()
+      const deltaTime = Math.min((now - lastAiUpdateRef.current) / 1000, 0.1)
+      lastAiUpdateRef.current = now
 
-    setPlayer2Paddle({
-      position: { x: Math.max(0.2, Math.min(0.8, targetX)), y: targetY },
-      isActive: true,
-      hand: 'Right',
-    })
+      const ballState = gameRef.current.getBallState()
+      const aiPaddle = aiRef.current.update(ballState, deltaTime)
 
-    gameRef.current.setPlayer2Paddle({
-      position: { x: Math.max(0.2, Math.min(0.8, targetX)), y: targetY },
-      isActive: true,
-      hand: 'Right',
-    })
-  }, [phase, setPlayer2Paddle])
+      gameRef.current.setPlayer2Paddle(aiPaddle)
+
+      animationId = requestAnimationFrame(updateAI)
+    }
+
+    lastAiUpdateRef.current = performance.now()
+    animationId = requestAnimationFrame(updateAI)
+
+    return () => {
+      cancelAnimationFrame(animationId)
+    }
+  }, [phase])
 
   useEffect(() => {
     return () => {
@@ -182,7 +190,7 @@ export function Playfield() {
     <div className="playfield">
       <video ref={videoRef} className="webcam-feed" playsInline muted />
       <canvas ref={canvasRef} className="game-canvas" />
-      <HandOverlay showLandmarks={true} showPaddle={true} />
+      <HandOverlay paddleSize={0.035} showDebug={false} />
       <GameHUD />
       <DebugPanel />
 

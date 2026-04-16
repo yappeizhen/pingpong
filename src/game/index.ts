@@ -1,4 +1,5 @@
 export { PongGame } from './PongGame'
 export type { PointCallback } from './PongGame'
 export { BallPhysics } from './BallPhysics'
+export { AIController } from './AIController'
 export * from './constants'

@@ -12,27 +12,27 @@ export const BALL = {
   RADIUS: 0.02,
   MASS: 0.0027,
   COLOR: 0xffa500,
-  INITIAL_SPEED: 3.0,
-  MAX_SPEED: 8.0,
-  BOUNCE_COEFFICIENT: 0.9,
-  SPIN_FACTOR: 0.3,
+  INITIAL_SPEED: 2.0,
+  MAX_SPEED: 6.0,
+  BOUNCE_COEFFICIENT: 0.85,
+  SPIN_FACTOR: 0.2,
 } as const
 
 export const PADDLE = {
-  RADIUS: 0.08,
+  RADIUS: 0.12,
   THICKNESS: 0.01,
   COLOR: 0xff4444,
   OPPONENT_COLOR: 0x4444ff,
-  HIT_ZONE: 0.12,
+  HIT_ZONE: 0.28,
   ACTIVE_OPACITY: 0.9,
   INACTIVE_OPACITY: 0.4,
 } as const
 
 export const PHYSICS = {
-  GRAVITY: -9.81,
-  AIR_RESISTANCE: 0.99,
+  GRAVITY: -6.0,
+  AIR_RESISTANCE: 0.995,
   TIME_STEP: 1 / 120,
-  TABLE_FRICTION: 0.7,
+  TABLE_FRICTION: 0.8,
 } as const
 
 export const CAMERA = {
