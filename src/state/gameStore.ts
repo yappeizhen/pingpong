@@ -36,7 +36,7 @@ const initialBall: BallState = {
 
 const initialPlayer2 = {
   id: 'player2',
-  name: 'AI',
+  name: 'Opponent',
   score: 0,
   paddle: initialPaddle,
   isServing: false,

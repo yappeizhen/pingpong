@@ -2,10 +2,13 @@ import { useGameStore } from '@/state'
 import './GameHUD.css'
 
 export function GameHUD() {
-  const { player1, player2, servingPlayer, rallyCount, phase } = useGameStore()
+  const { player1, player2, servingPlayer, rallyCount, phase, resetGame } = useGameStore()
 
   return (
     <div className="game-hud">
+      <button className="hud-menu-btn" onClick={resetGame} title="Return to menu">
+        ✕
+      </button>
       <div className="hud-scores">
         <div className={`hud-player ${servingPlayer === 'player1' ? 'serving' : ''}`}>
           <span className="player-name">{player1.name}</span>
