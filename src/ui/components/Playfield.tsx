@@ -216,7 +216,7 @@ export function Playfield() {
     <div className="playfield">
       <video ref={videoRef} className="webcam-feed" playsInline muted />
       <canvas ref={canvasRef} className="game-canvas" />
-      <HandOverlay paddleSize={0.035} paddleColor="#ffdd00" showDebug={false} />
+      <HandOverlay paddleSize={0.035} paddleColor="#ffdd00" showDebug={true} />
       <GameHUD />
       <DebugPanel />
 

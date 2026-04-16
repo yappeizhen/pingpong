@@ -19,9 +19,11 @@ export function extractPalmPosition(hand: HandPrediction): PalmPosition {
 
   const isOpen = detectOpenPalm(hand)
 
+  // Clamp to 0-1 range - MediaPipe can return values slightly outside
+  // this range when hand is near camera edges
   return {
-    x: palmCenter.x,
-    y: palmCenter.y,
+    x: Math.max(0, Math.min(1, palmCenter.x)),
+    y: Math.max(0, Math.min(1, palmCenter.y)),
     z: palmCenter.z,
     isOpen,
     confidence: hand.score,
@@ -40,17 +42,19 @@ function detectOpenPalm(hand: HandPrediction): boolean {
     const pip = hand.landmarks[fingerPIPs[i]]
     const mcp = hand.landmarks[fingerMCPs[i]]
 
-    // Finger is extended if tip is above PIP AND significantly above MCP
-    const tipAbovePip = tip.y < pip.y
-    const tipAboveMcp = tip.y < mcp.y - 0.02
-
-    if (tipAbovePip && tipAboveMcp) {
+    // Use distance-based detection (rotation invariant)
+    // Finger is extended if tip is further from MCP than PIP is from MCP
+    const tipToMcp = Math.hypot(tip.x - mcp.x, tip.y - mcp.y)
+    const pipToMcp = Math.hypot(pip.x - mcp.x, pip.y - mcp.y)
+    
+    // Extended if fingertip is at least 1.5x further from knuckle than the middle joint
+    if (tipToMcp > pipToMcp * 1.5) {
       extendedCount++
     }
   }
 
-  // Require at least 4 fingers extended (stricter than before)
-  return extendedCount >= 4
+  // Require at least 3 fingers extended (more lenient for edge positions)
+  return extendedCount >= 3
 }
 
 export function getPrimaryHand(hands: HandPrediction[], preferred: Handedness = 'Right'): HandPrediction | null {
@@ -67,28 +71,14 @@ export function handToPaddlePosition(
   palm: PalmPosition,
   _hand: HandPrediction
 ): { x: number; y: number } {
-  // Scale factor: larger = more hand movement needed, gentler response
-  // 0.8 means 80% of camera view = 100% of paddle range
-  const SCALE_X = 0.80  // Gentle horizontal scaling
-  const SCALE_Y = 0.70  // Gentle vertical scaling
+  // Direct mapping: hand position maps 1:1 to paddle position
+  // No device-specific offsets - just mirror and invert as needed
+  const x = 1 - palm.x // Mirror horizontally (so moving left moves paddle left)
+  const y = 1 - palm.y // Invert Y (hand up = paddle up)
   
-  // Center offset: where in camera space maps to paddle center
-  // palm.x/y are 0-1 where 0,0 is top-left of camera feed
-  // Shift CENTER_X to give more room for leftward movement
-  const CENTER_X = 0.55  // Shifted right to give more left room
-  const CENTER_Y = 0.50  // Middle of camera view = paddle center
-  
-  // Map from camera space to paddle space with scaling
-  const rawX = 1 - palm.x // Mirror horizontally
-  const rawY = 1 - palm.y // Invert Y (hand up = paddle up)
-  
-  // Center the mapping
-  const scaledX = 0.5 + (rawX - CENTER_X) / SCALE_X
-  const scaledY = 0.5 + (rawY - (1 - CENTER_Y)) / SCALE_Y
-  
-  // Clamp to valid range
+  // Clamp to valid range (0-1)
   return {
-    x: Math.max(0.08, Math.min(0.92, scaledX)),
-    y: Math.max(0.08, Math.min(0.92, scaledY)),
+    x: Math.max(0.0, Math.min(1.0, x)),
+    y: Math.max(0.0, Math.min(1.0, y)),
   }
 }
