@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { useHandData } from '@/cv'
-import { extractPalmPosition, handToPaddlePosition } from '@/cv/palmDetector'
+import { extractPalmPosition, handToPaddlePosition, getPrimaryHand } from '@/cv/palmDetector'
 import { SwipeDetector } from '@/cv/swipeDetector'
 import './HandOverlay.css'
 
@@ -65,121 +65,119 @@ export function HandOverlay({
 
     if (!frame || frame.hands.length === 0) return
 
-    frame.hands.forEach((hand, handIndex) => {
-      if (hand.landmarks.length < 21) return
+    // Only show paddle for the primary hand (same as game logic)
+    const hand = getPrimaryHand(frame.hands, 'Right')
+    if (!hand || hand.landmarks.length < 21) return
 
-      const palm = extractPalmPosition(hand)
-      const swipe = swipeDetectorRef.current?.update(palm.isOpen ? palm : null) ?? { isSwinging: false, speed: 0 }
+    const palm = extractPalmPosition(hand)
+    const swipe = swipeDetectorRef.current?.update(palm.isOpen ? palm : null) ?? { isSwinging: false, speed: 0 }
+    
+    // Use scaled paddle position so overlay matches actual game paddle
+    const paddlePos = handToPaddlePosition(palm, hand)
+    const palmX = paddlePos.x * canvas.width
+    const palmY = (1 - paddlePos.y) * canvas.height
+
+    const baseSize = Math.min(canvas.width, canvas.height)
+    const paddleRadius = baseSize * paddleSize
+
+    // Update trail
+    const now = performance.now()
+    if (palm.isOpen) {
+      trailRef.current.push({ x: palmX, y: palmY, time: now })
+    }
+    trailRef.current = trailRef.current.filter(p => now - p.time < 150)
+
+    // Draw motion trail when swinging
+    if (trailRef.current.length > 2 && swipe.isSwinging) {
+      ctx.beginPath()
+      ctx.moveTo(trailRef.current[0].x, trailRef.current[0].y)
+      for (let i = 1; i < trailRef.current.length; i++) {
+        ctx.lineTo(trailRef.current[i].x, trailRef.current[i].y)
+      }
+      ctx.strokeStyle = `${paddleColor}88`
+      ctx.lineWidth = paddleRadius * 1.5
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.stroke()
+    }
+
+    if (palm.isOpen) {
+      ctx.save()
       
-      // Use scaled paddle position so overlay matches actual game paddle
-      const paddlePos = handToPaddlePosition(palm, hand)
-      const palmX = paddlePos.x * canvas.width
-      const palmY = (1 - paddlePos.y) * canvas.height
+      // Glow stronger when swinging - yellow theme
+      ctx.shadowColor = swipe.isSwinging ? '#ffee00' : paddleColor
+      ctx.shadowBlur = swipe.isSwinging ? 30 : 15
+      
+      // Paddle grows slightly when swinging
+      const swingScale = swipe.isSwinging ? 1.15 : 1.0
+      const currentRadius = paddleRadius * swingScale
+      
+      ctx.beginPath()
+      ctx.arc(palmX, palmY, currentRadius, 0, Math.PI * 2)
+      // Brighter yellow when swinging
+      ctx.fillStyle = swipe.isSwinging ? '#ffee55' : paddleColor
+      ctx.globalAlpha = 0.9
+      ctx.fill()
+      
+      ctx.strokeStyle = swipe.isSwinging ? '#ffffff' : 'rgba(255, 255, 255, 0.8)'
+      ctx.lineWidth = swipe.isSwinging ? 3 : 2
+      ctx.globalAlpha = 1
+      ctx.stroke()
+      
+      // Inner circle
+      ctx.beginPath()
+      ctx.arc(palmX, palmY, currentRadius * 0.5, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'
+      ctx.lineWidth = 1
+      ctx.stroke()
+      
+      // Handle - use raw landmarks for angle calculation
+      const wrist = hand.landmarks[0]
+      const rawPalmX = (1 - palm.x) * canvas.width
+      const rawPalmY = palm.y * canvas.height
+      const wristX = (1 - wrist.x) * canvas.width
+      const wristY = wrist.y * canvas.height
+      
+      const angle = Math.atan2(wristY - rawPalmY, wristX - rawPalmX)
+      const handleLength = currentRadius * 0.7
+      const handleX = palmX + Math.cos(angle) * (currentRadius + handleLength * 0.3)
+      const handleY = palmY + Math.sin(angle) * (currentRadius + handleLength * 0.3)
+      
+      ctx.beginPath()
+      ctx.moveTo(
+        palmX + Math.cos(angle) * currentRadius * 0.7,
+        palmY + Math.sin(angle) * currentRadius * 0.7
+      )
+      ctx.lineTo(handleX, handleY)
+      ctx.strokeStyle = '#8B4513'
+      ctx.lineWidth = currentRadius * 0.35
+      ctx.lineCap = 'round'
+      ctx.stroke()
+      
+      ctx.restore()
 
-      const baseSize = Math.min(canvas.width, canvas.height)
-      const paddleRadius = baseSize * paddleSize
-
-      const color = handIndex === 0 ? paddleColor : '#22d3ee'
-
-      // Update trail
-      const now = performance.now()
-      if (palm.isOpen) {
-        trailRef.current.push({ x: palmX, y: palmY, time: now })
-      }
-      trailRef.current = trailRef.current.filter(p => now - p.time < 150)
-
-      // Draw motion trail when swinging
-      if (trailRef.current.length > 2 && swipe.isSwinging) {
-        ctx.beginPath()
-        ctx.moveTo(trailRef.current[0].x, trailRef.current[0].y)
-        for (let i = 1; i < trailRef.current.length; i++) {
-          ctx.lineTo(trailRef.current[i].x, trailRef.current[i].y)
-        }
-        ctx.strokeStyle = `${color}88`
-        ctx.lineWidth = paddleRadius * 1.5
-        ctx.lineCap = 'round'
-        ctx.lineJoin = 'round'
-        ctx.stroke()
-      }
-
-      if (palm.isOpen) {
-        ctx.save()
-        
-        // Glow stronger when swinging - yellow theme
-        ctx.shadowColor = swipe.isSwinging ? '#ffee00' : color
-        ctx.shadowBlur = swipe.isSwinging ? 30 : 15
-        
-        // Paddle grows slightly when swinging
-        const swingScale = swipe.isSwinging ? 1.15 : 1.0
-        const currentRadius = paddleRadius * swingScale
-        
-        ctx.beginPath()
-        ctx.arc(palmX, palmY, currentRadius, 0, Math.PI * 2)
-        // Brighter yellow when swinging
-        ctx.fillStyle = swipe.isSwinging ? '#ffee55' : color
-        ctx.globalAlpha = 0.9
-        ctx.fill()
-        
-        ctx.strokeStyle = swipe.isSwinging ? '#ffffff' : 'rgba(255, 255, 255, 0.8)'
-        ctx.lineWidth = swipe.isSwinging ? 3 : 2
-        ctx.globalAlpha = 1
-        ctx.stroke()
-        
-        // Inner circle
-        ctx.beginPath()
-        ctx.arc(palmX, palmY, currentRadius * 0.5, 0, Math.PI * 2)
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'
-        ctx.lineWidth = 1
-        ctx.stroke()
-        
-        // Handle - use raw landmarks for angle calculation
-        const wrist = hand.landmarks[0]
-        const rawPalmX = (1 - palm.x) * canvas.width
-        const rawPalmY = palm.y * canvas.height
-        const wristX = (1 - wrist.x) * canvas.width
-        const wristY = wrist.y * canvas.height
-        
-        const angle = Math.atan2(wristY - rawPalmY, wristX - rawPalmX)
-        const handleLength = currentRadius * 0.7
-        const handleX = palmX + Math.cos(angle) * (currentRadius + handleLength * 0.3)
-        const handleY = palmY + Math.sin(angle) * (currentRadius + handleLength * 0.3)
-        
-        ctx.beginPath()
-        ctx.moveTo(
-          palmX + Math.cos(angle) * currentRadius * 0.7,
-          palmY + Math.sin(angle) * currentRadius * 0.7
-        )
-        ctx.lineTo(handleX, handleY)
-        ctx.strokeStyle = '#8B4513'
-        ctx.lineWidth = currentRadius * 0.35
-        ctx.lineCap = 'round'
-        ctx.stroke()
-        
-        ctx.restore()
-
-        // Show swing indicator when ready to hit
-        if (swipe.isSwinging) {
-          ctx.font = 'bold 12px Inter, sans-serif'
-          ctx.fillStyle = '#ffffff'
-          ctx.textAlign = 'center'
-          ctx.fillText('●', palmX, palmY - currentRadius - 8)
-        }
-      } else {
-        trailRef.current = []
-        ctx.beginPath()
-        ctx.arc(palmX, palmY, paddleRadius, 0, Math.PI * 2)
-        ctx.strokeStyle = 'rgba(100, 100, 120, 0.5)'
-        ctx.lineWidth = 2
-        ctx.setLineDash([4, 4])
-        ctx.stroke()
-        ctx.setLineDash([])
-        
-        ctx.font = 'bold 16px Inter, sans-serif'
-        ctx.fillStyle = 'rgba(150, 150, 170, 0.7)'
+      // Show swing indicator when ready to hit
+      if (swipe.isSwinging) {
+        ctx.font = 'bold 12px Inter, sans-serif'
+        ctx.fillStyle = '#ffffff'
         ctx.textAlign = 'center'
-        ctx.fillText('✊', palmX, palmY + 5)
+        ctx.fillText('●', palmX, palmY - currentRadius - 8)
       }
-    })
+    } else {
+      trailRef.current = []
+      ctx.beginPath()
+      ctx.arc(palmX, palmY, paddleRadius, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(100, 100, 120, 0.5)'
+      ctx.lineWidth = 2
+      ctx.setLineDash([4, 4])
+      ctx.stroke()
+      ctx.setLineDash([])
+      
+      ctx.font = 'bold 16px Inter, sans-serif'
+      ctx.fillStyle = 'rgba(150, 150, 170, 0.7)'
+      ctx.textAlign = 'center'
+      ctx.fillText('✊', palmX, palmY + 5)
+    }
 
     if (showDebug && frame.hands.length > 0) {
       ctx.font = '11px monospace'
