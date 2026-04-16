@@ -35,7 +35,10 @@ export interface BallState {
 
 export interface PaddleState {
   position: Vector2
+  velocity: Vector2
   isActive: boolean
+  isSwinging: boolean
+  swipeSpeed: number
   hand: Handedness | null
 }
 

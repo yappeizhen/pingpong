@@ -33,25 +33,30 @@ export class BallPhysics {
     const seededRandom = this.seededRandom(seed)
     
     // Player 1 is at +z (near camera), Player 2 (AI) is at -z (far side)
-    // When player1 serves: start at +z, velocity goes to -z (towards AI)
-    // When player2 serves: start at -z, velocity goes to +z (towards player1)
+    // Start ball at back edge of server's side, with good arc to reach opponent
     const startZ = player === 'player1' 
-      ? this.tableHalfLength * 0.6   // Near player 1 (positive z)
-      : -this.tableHalfLength * 0.6  // Near player 2/AI (negative z)
+      ? this.tableHalfLength * 0.85   // Near back of player 1's side
+      : -this.tableHalfLength * 0.85  // Near back of AI's side
+    
+    // Serve speed - needs enough forward momentum to reach deep into opponent's side
+    const serveSpeed = BALL.INITIAL_SPEED + 0.8 + seededRandom() * 0.4
     
     const velocityZ = player === 'player1'
-      ? -(BALL.INITIAL_SPEED + seededRandom() * 0.5)  // Towards AI (negative)
-      : (BALL.INITIAL_SPEED + seededRandom() * 0.5)   // Towards player1 (positive)
+      ? -serveSpeed  // Towards AI (negative z)
+      : serveSpeed   // Towards player1 (positive z)
+
+    // Higher arc for better serve - gives time to travel and bounce properly
+    const upwardVelocity = 2.5 + seededRandom() * 0.5
 
     this.state = {
       position: {
-        x: (seededRandom() - 0.5) * 0.3,
-        y: TABLE.HEIGHT + 0.25,
+        x: (seededRandom() - 0.5) * 0.2,
+        y: TABLE.HEIGHT + 0.3,
         z: startZ,
       },
       velocity: {
-        x: (seededRandom() - 0.5) * 0.5,
-        y: 1.5 + seededRandom() * 0.5,
+        x: (seededRandom() - 0.5) * 0.3,
+        y: upwardVelocity,
         z: velocityZ,
       },
       spin: { x: 0, y: 0 },
@@ -61,12 +66,7 @@ export class BallPhysics {
 
     this.bouncedOnPlayerSide = { player1: false, player2: false }
     
-    console.log(`[Physics] ${player} served:`, {
-      startZ: startZ.toFixed(2),
-      velocityZ: velocityZ.toFixed(2),
-      position: this.state.position,
-      velocity: this.state.velocity
-    })
+    console.log(`[Physics] ${player} served: speed=${serveSpeed.toFixed(2)}, arc=${upwardVelocity.toFixed(2)}`)
   }
 
   update(
@@ -188,33 +188,45 @@ export class BallPhysics {
       (player === 'player1' && this.state.velocity.z > 0) ||
       (player === 'player2' && this.state.velocity.z < 0)
 
-    if (distanceXY < hitZone && Math.abs(dz) < 0.35 && approachingPaddle) {
+    // For player, require swinging motion; AI is always ready
+    const canHit = player === 'player2' || paddle.isSwinging
+
+    if (distanceXY < hitZone && Math.abs(dz) < 0.2 && approachingPaddle && canHit) {
       const direction = player === 'player1' ? -1 : 1
-      const speed = Math.sqrt(
+      const incomingSpeed = Math.sqrt(
         this.state.velocity.x ** 2 +
           this.state.velocity.y ** 2 +
           this.state.velocity.z ** 2
       )
-      const newSpeed = Math.min(speed * 1.05 + 0.5, BALL.MAX_SPEED)
+      
+      // Use paddle swing speed to boost the hit
+      const swingBoost = player === 'player1' ? Math.min(paddle.swipeSpeed * 20, 2.0) : 0.5
+      const baseSpeed = Math.max(incomingSpeed, 2.5)
+      const newSpeed = Math.min(baseSpeed * 1.1 + 0.8 + swingBoost, BALL.MAX_SPEED)
 
+      // Use paddle velocity to influence ball direction
+      const paddleVelInfluence = player === 'player1' ? 0.4 : 0
+      const swipeX = paddle.velocity.x * paddleVelInfluence
+      
       const offsetX = dx / hitZone
       const offsetY = dy / hitZone
 
+      // Ball trajectory influenced by swing direction
       this.state.velocity = {
-        x: offsetX * newSpeed * 0.4,
-        y: 1.0 + Math.abs(offsetY) * newSpeed * 0.3,
-        z: direction * newSpeed * 0.85,
+        x: (offsetX * 0.3 + swipeX * 2) * newSpeed,
+        y: 1.8 + Math.abs(offsetY) * newSpeed * 0.2 + swingBoost * 0.3,
+        z: direction * newSpeed * 0.95,
       }
 
       this.state.spin = {
-        x: offsetX * 3,
-        y: offsetY * 3,
+        x: (offsetX + swipeX * 3) * 2,
+        y: offsetY * 2,
       }
 
       this.state.lastHitBy = player
       this.bouncedOnPlayerSide = { player1: false, player2: false }
       
-      console.log(`[Physics] ${player} hit ball, new velocity:`, this.state.velocity)
+      console.log(`[Physics] ${player} hit ball, speed: ${newSpeed.toFixed(2)}, swingBoost: ${swingBoost.toFixed(2)}`)
     }
   }
 

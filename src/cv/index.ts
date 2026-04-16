@@ -1,6 +1,8 @@
 export { createHandTracker } from './handTracker'
 export type { HandTracker, HandFrameListener, StatusListener } from './handTracker'
 export { extractPalmPosition, getPrimaryHand, handToPaddlePosition } from './palmDetector'
+export { SwipeDetector } from './swipeDetector'
+export type { SwipeState } from './swipeDetector'
 export { HandTrackerContext } from './HandTrackerContext'
 export { HandTrackerProvider } from './HandTrackerProvider'
 export { useHandData } from './useHandData'

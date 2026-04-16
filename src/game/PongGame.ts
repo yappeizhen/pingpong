@@ -22,8 +22,8 @@ export class PongGame {
   private animationHandle: number | null = null
   private lastTime = 0
 
-  private player1Paddle: PaddleState = { position: { x: 0.5, y: 0.5 }, isActive: false, hand: null }
-  private player2Paddle: PaddleState = { position: { x: 0.5, y: 0.5 }, isActive: false, hand: null }
+  private player1Paddle: PaddleState = { position: { x: 0.5, y: 0.5 }, velocity: { x: 0, y: 0 }, isActive: false, isSwinging: false, swipeSpeed: 0, hand: null }
+  private player2Paddle: PaddleState = { position: { x: 0.5, y: 0.5 }, velocity: { x: 0, y: 0 }, isActive: true, isSwinging: true, swipeSpeed: 0.5, hand: 'Right' }
 
   private onPoint: PointCallback | null = null
 

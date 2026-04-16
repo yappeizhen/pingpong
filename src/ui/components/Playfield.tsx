@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { PongGame } from '@/game'
 import { AIController } from '@/game/AIController'
-import { useHandData, extractPalmPosition, getPrimaryHand, handToPaddlePosition } from '@/cv'
+import { useHandData, extractPalmPosition, getPrimaryHand, handToPaddlePosition, SwipeDetector } from '@/cv'
 import { useGameStore } from '@/state'
 import { DebugPanel } from './DebugPanel'
 import { GameHUD } from './GameHUD'
@@ -13,6 +13,7 @@ export function Playfield() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const gameRef = useRef<PongGame | null>(null)
   const aiRef = useRef<AIController | null>(null)
+  const swipeDetectorRef = useRef<SwipeDetector | null>(null)
   const serveTimeoutRef = useRef<number | null>(null)
   const lastAiUpdateRef = useRef<number>(0)
 
@@ -31,7 +32,8 @@ export function Playfield() {
 
     const game = new PongGame(canvasRef.current)
     gameRef.current = game
-    aiRef.current = new AIController('medium')
+    aiRef.current = new AIController('hard')
+    swipeDetectorRef.current = new SwipeDetector()
 
     game.setOnPoint((winner, reason) => {
       console.log(`Point for ${winner}: ${reason}`)
@@ -44,6 +46,7 @@ export function Playfield() {
       game.dispose()
       gameRef.current = null
       aiRef.current = null
+      swipeDetectorRef.current = null
     }
   }, [scorePoint])
 
@@ -120,29 +123,38 @@ export function Playfield() {
   const lastPaddlePosRef = useRef({ x: 0.5, y: 0.5 })
 
   useEffect(() => {
-    if (!frame || !gameRef.current) return
+    if (!frame || !gameRef.current || !swipeDetectorRef.current) return
 
     const primaryHand = getPrimaryHand(frame.hands, 'Right')
 
     if (primaryHand) {
       const palm = extractPalmPosition(primaryHand)
       const paddlePos = handToPaddlePosition(palm, primaryHand)
+      const swipe = swipeDetectorRef.current.update(palm.isOpen ? palm : null)
 
       lastPaddlePosRef.current = paddlePos
 
       gameRef.current.setPlayer1Paddle({
         position: paddlePos,
+        velocity: swipe.velocity,
         isActive: palm.isOpen,
+        isSwinging: swipe.isSwinging,
+        swipeSpeed: swipe.speed,
         hand: primaryHand.handedness,
       })
 
-      if (phase === 'serving' && servingPlayer === 'player1' && palm.isOpen) {
+      // Serve when palm is open and swinging
+      if (phase === 'serving' && servingPlayer === 'player1' && palm.isOpen && swipe.isSwinging) {
         handleServe()
       }
     } else {
+      swipeDetectorRef.current.update(null)
       gameRef.current.setPlayer1Paddle({
         position: lastPaddlePosRef.current,
+        velocity: { x: 0, y: 0 },
         isActive: false,
+        isSwinging: false,
+        swipeSpeed: 0,
         hand: null,
       })
     }

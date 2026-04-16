@@ -31,29 +31,26 @@ export function extractPalmPosition(hand: HandPrediction): PalmPosition {
 function detectOpenPalm(hand: HandPrediction): boolean {
   const fingerTips = [8, 12, 16, 20]
   const fingerPIPs = [6, 10, 14, 18]
+  const fingerMCPs = [5, 9, 13, 17]
 
   let extendedCount = 0
 
   for (let i = 0; i < 4; i++) {
     const tip = hand.landmarks[fingerTips[i]]
     const pip = hand.landmarks[fingerPIPs[i]]
+    const mcp = hand.landmarks[fingerMCPs[i]]
 
-    if (tip.y < pip.y) {
+    // Finger is extended if tip is above PIP AND significantly above MCP
+    const tipAbovePip = tip.y < pip.y
+    const tipAboveMcp = tip.y < mcp.y - 0.02
+
+    if (tipAbovePip && tipAboveMcp) {
       extendedCount++
     }
   }
 
-  const thumbTip = hand.landmarks[4]
-  const thumbIP = hand.landmarks[3]
-  const thumbMCP = hand.landmarks[2]
-
-  const thumbExtended = Math.abs(thumbTip.x - thumbMCP.x) > Math.abs(thumbIP.x - thumbMCP.x) * 0.8
-
-  if (thumbExtended) {
-    extendedCount++
-  }
-
-  return extendedCount >= 3
+  // Require at least 4 fingers extended (stricter than before)
+  return extendedCount >= 4
 }
 
 export function getPrimaryHand(hands: HandPrediction[], preferred: Handedness = 'Right'): HandPrediction | null {

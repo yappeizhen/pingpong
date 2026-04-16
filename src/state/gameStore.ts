@@ -19,7 +19,10 @@ interface GameStore extends GameState {
 
 const initialPaddle: PaddleState = {
   position: { x: 0.5, y: 0.5 },
+  velocity: { x: 0, y: 0 },
   isActive: false,
+  isSwinging: false,
+  swipeSpeed: 0,
   hand: null,
 }
 
