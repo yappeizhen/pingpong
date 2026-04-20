@@ -57,6 +57,7 @@ const getInitialState = (): GameState => ({
   },
   player2: { ...initialPlayer2 },
   servingPlayer: 'player1',
+  lastScorer: null,
   rallyCount: 0,
   matchPoint: GAME.POINTS_TO_WIN,
   seed: Date.now(),
@@ -109,6 +110,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       player1: { ...state.player1, score: newScore1, isServing: newServer === 'player1' },
       player2: { ...state.player2, score: newScore2, isServing: newServer === 'player2' },
       servingPlayer: newServer,
+      lastScorer: winner,
       rallyCount: 0,
       phase: gameOver ? 'game-over' : 'point-scored',
     })

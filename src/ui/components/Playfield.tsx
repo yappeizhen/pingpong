@@ -259,13 +259,13 @@ function CountdownOverlay() {
 }
 
 function PointScoredOverlay() {
-  const { player1, player2 } = useGameStore()
-  const lastScorer = player1.score > player2.score ? player1 : player2
+  const { player1, player2, lastScorer } = useGameStore()
+  const scorer = lastScorer === 'player1' ? player1 : player2
 
   return (
     <div className="point-overlay">
       <span className="point-text">Point!</span>
-      <span className="point-scorer">{lastScorer.name}</span>
+      <span className="point-scorer">{scorer.name}</span>
     </div>
   )
 }

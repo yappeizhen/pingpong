@@ -58,6 +58,7 @@ export interface GameState {
   player1: PlayerState
   player2: PlayerState
   servingPlayer: Player
+  lastScorer: Player | null
   rallyCount: number
   matchPoint: number
   seed: number
