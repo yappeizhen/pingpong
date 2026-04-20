@@ -10,9 +10,16 @@ import {
   query,
   where,
   type Unsubscribe,
+  type Firestore,
 } from 'firebase/firestore'
 import { getDb, isFirebaseEnabled } from '@/services/firebase'
 import type { Room, RoomData, RoomPlayer, RoomState } from './types'
+
+const ROOMS_PATH = ['pingponghub', 'rooms', 'active'] as const
+
+const getRoomsCollection = (db: Firestore) => collection(db, ...ROOMS_PATH)
+const getRoomDoc = (db: Firestore, roomId: string) => doc(db, ...ROOMS_PATH, roomId)
+const getRoomSignaling = (db: Firestore, roomId: string) => collection(db, ...ROOMS_PATH, roomId, 'signaling')
 
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const ROOM_CODE_LENGTH = 4
@@ -79,7 +86,7 @@ export async function createRoom(playerName: string): Promise<Room | null> {
   }
 
   try {
-    await setDoc(doc(db, 'rooms', roomId), roomData)
+    await setDoc(getRoomDoc(db, roomId), roomData)
     return {
       id: roomId,
       ...roomData,
@@ -98,9 +105,8 @@ export async function findRoomByCode(code: string): Promise<Room | null> {
   const upperCode = code.toUpperCase()
 
   try {
-    const roomsRef = collection(db, 'rooms')
     const q = query(
-      roomsRef,
+      getRoomsCollection(db),
       where('code', '==', upperCode),
       where('state', '==', 'waiting')
     )
@@ -138,7 +144,7 @@ export async function joinRoom(roomId: string, playerName: string): Promise<bool
   }
 
   try {
-    const roomRef = doc(db, 'rooms', roomId)
+    const roomRef = getRoomDoc(db, roomId)
     const snapshot = await getDoc(roomRef)
 
     if (!snapshot.exists()) return false
@@ -168,7 +174,7 @@ export async function leaveRoom(roomId: string): Promise<void> {
   const playerId = getPlayerId()
 
   try {
-    const roomRef = doc(db, 'rooms', roomId)
+    const roomRef = getRoomDoc(db, roomId)
     const snapshot = await getDoc(roomRef)
 
     if (!snapshot.exists()) return
@@ -180,8 +186,7 @@ export async function leaveRoom(roomId: string): Promise<void> {
       await deleteDoc(roomRef)
       
       try {
-        const signalingCol = collection(db, 'rooms', roomId, 'signaling')
-        const signalingDocs = await getDocs(signalingCol)
+        const signalingDocs = await getDocs(getRoomSignaling(db, roomId))
         const deletePromises = signalingDocs.docs.map((d) => deleteDoc(d.ref))
         await Promise.all(deletePromises)
       } catch {
@@ -215,7 +220,6 @@ export async function updateRoomState(roomId: string, state: RoomState): Promise
   if (!db) return
 
   try {
-    const roomRef = doc(db, 'rooms', roomId)
     const updates: Record<string, unknown> = { state }
     
     if (state === 'playing') {
@@ -224,7 +228,7 @@ export async function updateRoomState(roomId: string, state: RoomState): Promise
       updates.endedAt = Date.now()
     }
     
-    await updateDoc(roomRef, updates)
+    await updateDoc(getRoomDoc(db, roomId), updates)
   } catch {
     // Ignore update errors
   }
@@ -241,8 +245,7 @@ export async function updatePlayerScore(
   if (!db) return
 
   try {
-    const roomRef = doc(db, 'rooms', roomId)
-    await updateDoc(roomRef, {
+    await updateDoc(getRoomDoc(db, roomId), {
       [`players.${playerId}.score`]: score,
       [`players.${playerId}.lastActivity`]: Date.now(),
     })
@@ -258,8 +261,7 @@ export async function setGameWinner(roomId: string, winnerId: string): Promise<v
   if (!db) return
 
   try {
-    const roomRef = doc(db, 'rooms', roomId)
-    await updateDoc(roomRef, {
+    await updateDoc(getRoomDoc(db, roomId), {
       state: 'finished' as RoomState,
       winnerId,
       endedAt: Date.now(),
@@ -279,10 +281,8 @@ export function subscribeToRoom(
     return () => {}
   }
 
-  const roomRef = doc(db, 'rooms', roomId)
-
   return onSnapshot(
-    roomRef,
+    getRoomDoc(db, roomId),
     (snapshot) => {
       if (!snapshot.exists()) {
         callback(null)
@@ -313,8 +313,7 @@ export async function setPlayerConnected(
   const playerId = getPlayerId()
 
   try {
-    const roomRef = doc(db, 'rooms', roomId)
-    await updateDoc(roomRef, {
+    await updateDoc(getRoomDoc(db, roomId), {
       [`players.${playerId}.connected`]: connected,
       [`players.${playerId}.lastActivity`]: Date.now(),
     })
@@ -333,8 +332,7 @@ export async function cleanupStaleRooms(): Promise<void> {
   const FINISHED_STALE_MS = 2 * 60 * 1000 // 2 minutes
 
   try {
-    const roomsRef = collection(db, 'rooms')
-    const snapshot = await getDocs(roomsRef)
+    const snapshot = await getDocs(getRoomsCollection(db))
 
     const now = Date.now()
     const deletePromises: Promise<void>[] = []
@@ -344,13 +342,13 @@ export async function cleanupStaleRooms(): Promise<void> {
       const age = now - room.createdAt
 
       if (room.state === 'waiting' && age > WAITING_STALE_MS) {
-        deletePromises.push(deleteDoc(doc(db, 'rooms', docSnap.id)))
+        deletePromises.push(deleteDoc(getRoomDoc(db, docSnap.id)))
       }
 
       if (room.state === 'finished' && room.endedAt) {
         const finishedAge = now - room.endedAt
         if (finishedAge > FINISHED_STALE_MS) {
-          deletePromises.push(deleteDoc(doc(db, 'rooms', docSnap.id)))
+          deletePromises.push(deleteDoc(getRoomDoc(db, docSnap.id)))
         }
       }
     })

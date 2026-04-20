@@ -10,6 +10,8 @@ import {
 import { getDb, isFirebaseEnabled } from '@/services/firebase'
 import type { WebRTCConnection } from './types'
 
+const ROOMS_PATH = ['pingponghub', 'rooms', 'active'] as const
+
 const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -51,10 +53,10 @@ export async function createPeerConnection(
     onRemoteStream(remoteStream)
   }
 
-  const signalingDoc = doc(db, 'rooms', roomId, 'signaling', playerId)
-  const remoteSigDoc = doc(db, 'rooms', roomId, 'signaling', isHost ? 'guest' : 'host')
-  const iceCandidatesCol = collection(db, 'rooms', roomId, 'signaling', playerId, 'iceCandidates')
-  const remoteIceCol = collection(db, 'rooms', roomId, 'signaling', isHost ? 'guest' : 'host', 'iceCandidates')
+  const signalingDoc = doc(db, ...ROOMS_PATH, roomId, 'signaling', playerId)
+  const remoteSigDoc = doc(db, ...ROOMS_PATH, roomId, 'signaling', isHost ? 'guest' : 'host')
+  const iceCandidatesCol = collection(db, ...ROOMS_PATH, roomId, 'signaling', playerId, 'iceCandidates')
+  const remoteIceCol = collection(db, ...ROOMS_PATH, roomId, 'signaling', isHost ? 'guest' : 'host', 'iceCandidates')
 
   try {
     await deleteDoc(signalingDoc)
@@ -227,7 +229,7 @@ export async function closePeerConnection(
     const db = getDb()
     if (db) {
       try {
-        await deleteDoc(doc(db, 'rooms', roomId, 'signaling', playerId))
+        await deleteDoc(doc(db, ...ROOMS_PATH, roomId, 'signaling', playerId))
       } catch {
         // Ignore cleanup errors
       }

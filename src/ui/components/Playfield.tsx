@@ -27,6 +27,7 @@ export function Playfield() {
 
   const {
     phase,
+    mode,
     player1,
     player2,
     servingPlayer,
@@ -35,6 +36,7 @@ export function Playfield() {
     setPhase,
     scorePoint,
     resetGame,
+    startNewGame,
   } = useGameStore()
 
   const handlePaddleUpdate = useCallback(
@@ -150,7 +152,6 @@ export function Playfield() {
   }, [stopTracking])
 
   const scorerName = lastScorer === 'player1' ? player1.name : player2.name
-  const winnerName = player1.score > player2.score ? player1.name : player2.name
 
   return (
     <div className="playfield">
@@ -164,11 +165,11 @@ export function Playfield() {
       {phase === 'point-scored' && <PointScoredOverlay scorerName={scorerName} />}
       {phase === 'game-over' && (
         <GameOverOverlay
-          winnerName={winnerName}
           score={{ player1: player1.score, player2: player2.score }}
           player1Name={player1.name}
           player2Name={player2.name}
-          onPlayAgain={resetGame}
+          onPlayAgain={() => startNewGame(mode)}
+          onExit={resetGame}
           isVictory={player1.score > player2.score}
         />
       )}

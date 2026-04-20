@@ -48,7 +48,6 @@ interface GameOverOverlayProps {
   onPlayAgain?: () => void
   onExit?: () => void
   showPlayAgain?: boolean
-  showExit?: boolean
   isVictory?: boolean
 }
 
@@ -59,7 +58,6 @@ export function GameOverOverlay({
   onPlayAgain,
   onExit,
   showPlayAgain = true,
-  showExit = false,
   isVictory = true,
 }: GameOverOverlayProps) {
   const [showContent, setShowContent] = useState(false)
@@ -133,9 +131,10 @@ export function GameOverOverlay({
             Play Again
           </button>
         )}
-        {showExit && onExit && (
+        {onExit && (
           <button className="gameover-button secondary" onClick={onExit}>
-            Exit
+            <span className="button-icon">⌂</span>
+            Home
           </button>
         )}
       </div>

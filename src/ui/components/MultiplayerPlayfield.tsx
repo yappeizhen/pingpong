@@ -283,7 +283,6 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const isYourWin =
     (player1.score > player2.score && isHost) ||
     (player2.score > player1.score && !isHost)
-  const winnerName = isYourWin ? 'You' : (opponent?.name || 'Opponent')
 
   return (
     <div className="multiplayer-playfield">
@@ -302,13 +301,11 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
         {phase === 'game-over' && (
           <GameOverOverlay
-            winnerName={winnerName}
             score={{ player1: player1.score, player2: player2.score }}
             player1Name={isHost ? 'You' : (opponent?.name || 'Opponent')}
             player2Name={isHost ? (opponent?.name || 'Opponent') : 'You'}
             onPlayAgain={handlePlayAgain}
             onExit={handleExit}
-            showExit
             isVictory={isYourWin}
           />
         )}
