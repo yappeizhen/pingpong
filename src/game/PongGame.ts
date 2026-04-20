@@ -349,18 +349,9 @@ export class PongGame {
     let ballState: BallState
 
     if (this.isGuestMode && this.remoteBallState) {
-      // Guest mode: sync to host's ball state, but run local collision detection
-      // for responsive gameplay feedback
-      this.physics.setState(this.remoteBallState)
-      
-      // Run collision detection locally - both players detect points
-      const result = this.physics.update(delta, this.player1Paddle, this.player2Paddle)
-      
-      if (result.point && this.onPoint) {
-        this.onPoint(result.point.winner, result.point.reason)
-      }
-      
-      ballState = this.physics.getState()
+      // Guest mode: just display host's ball state
+      // Host is authoritative for all physics and point detection
+      ballState = this.remoteBallState
     } else if (this.isGuestMode) {
       // Guest mode but no remote state yet - just use current physics state
       ballState = this.physics.getState()

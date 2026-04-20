@@ -217,27 +217,24 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
     game.setGuestMode(!isHost)
 
-    // Both players detect points locally for responsive feedback
-    // Host sends authoritative score sync, guest reconciles when message arrives
-    game.setOnPoint((winner, reason) => {
-      // Only increment score locally if we haven't already processed this point
-      const currentPhase = phaseRef.current
-      if (currentPhase === 'point-scored') {
-        // Already processing a point, ignore duplicate detection
-        return
-      }
+    // Only host detects and reports points
+    // Guest receives points via sync messages from host
+    if (isHost) {
+      game.setOnPoint((winner, reason) => {
+        const currentPhase = phaseRef.current
+        if (currentPhase === 'point-scored') {
+          return
+        }
 
-      scorePoint(winner)
+        scorePoint(winner)
 
-      // Only host sends the authoritative point message
-      if (isHost) {
         const currentScore = scoreRef.current
         gameSyncService.sendPoint(winner, reason, {
           player1: winner === 'player1' ? currentScore.player1 + 1 : currentScore.player1,
           player2: winner === 'player2' ? currentScore.player2 + 1 : currentScore.player2,
         })
-      }
-    })
+      })
+    }
 
     game.start()
 
@@ -331,14 +328,14 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
         case 'point':
           if (!isHost && message.score) {
-            // Guest reconciles with host's authoritative score
-            // This corrects any desync from local detection
-            const currentState = useGameStore.getState()
-            if (currentState.player1.score !== message.score.player1 ||
-                currentState.player2.score !== message.score.player2) {
-              console.log('[MultiplayerPlayfield] Reconciling score with host:', message.score)
-              const { setScore } = useGameStore.getState()
-              setScore(message.score.player1, message.score.player2, message.winner)
+            // Guest receives authoritative score from host
+            console.log('[MultiplayerPlayfield] Received point from host:', message.winner, message.score)
+            const { setScore } = useGameStore.getState()
+            setScore(message.score.player1, message.score.player2, message.winner)
+            
+            // Reset ball for guest
+            if (gameRef.current) {
+              gameRef.current.reset()
             }
           }
           break
