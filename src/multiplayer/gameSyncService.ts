@@ -3,6 +3,7 @@ import type {
   PaddleSyncMessage,
   BallSyncMessage,
   ServeSyncMessage,
+  ServeRequestSyncMessage,
   PointSyncMessage,
   GameStartSyncMessage,
   GameEndSyncMessage,
@@ -73,6 +74,14 @@ export class GameSyncService {
       type: 'serve',
       player,
       seed,
+      timestamp: Date.now(),
+    }
+    this.send(message)
+  }
+
+  sendServeRequest() {
+    const message: ServeRequestSyncMessage = {
+      type: 'serve-request',
       timestamp: Date.now(),
     }
     this.send(message)

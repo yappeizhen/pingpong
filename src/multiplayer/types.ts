@@ -100,10 +100,16 @@ export interface GameEndSyncMessage {
   timestamp: number
 }
 
+export interface ServeRequestSyncMessage {
+  type: 'serve-request'
+  timestamp: number
+}
+
 export type GameSyncMessage =
   | PaddleSyncMessage
   | BallSyncMessage
   | ServeSyncMessage
+  | ServeRequestSyncMessage
   | PointSyncMessage
   | ReadySyncMessage
   | CountdownSyncMessage
