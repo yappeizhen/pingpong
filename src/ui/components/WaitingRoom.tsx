@@ -95,6 +95,9 @@ export function WaitingRoom({ onBack }: WaitingRoomProps) {
 
   return (
     <div className="waiting-room">
+      <button className="back-button" onClick={handleLeave} aria-label="Leave room">
+        ← Back
+      </button>
       <div className="waiting-content">
         <div className="waiting-icon">🎮</div>
         <h1 className="waiting-title">Waiting Room</h1>
