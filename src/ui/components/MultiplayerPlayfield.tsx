@@ -137,8 +137,12 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         await localVideoRef.current.play().catch(() => {})
       }
 
-      if (localVideoRef.current) {
-        await startTracking(localVideoRef.current)
+      try {
+        if (localVideoRef.current) {
+          await startTracking(localVideoRef.current)
+        }
+      } catch {
+        // MediaPipe may throw on reload - continue anyway
       }
 
       setConnectionStatus('Connecting to opponent...')

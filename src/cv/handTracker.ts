@@ -6,6 +6,22 @@ const MODEL_URL =
 const TASKS_VISION_VERSION = '0.10.22-rc.20250304'
 const WASM_FILES_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VISION_VERSION}/wasm`
 
+type WasmFilesetType = Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>
+let globalFilesetResolver: WasmFilesetType | null = null
+let filesetResolverPromise: Promise<WasmFilesetType> | null = null
+
+const getFilesetResolver = async (): Promise<WasmFilesetType> => {
+  if (globalFilesetResolver) return globalFilesetResolver
+  if (filesetResolverPromise) return filesetResolverPromise
+  
+  filesetResolverPromise = FilesetResolver.forVisionTasks(WASM_FILES_URL).then(resolver => {
+    globalFilesetResolver = resolver
+    return resolver
+  })
+  
+  return filesetResolverPromise
+}
+
 export type HandFrameListener = (frame: HandFrame | null) => void
 export type StatusListener = (status: HandTrackingStatus) => void
 
@@ -106,7 +122,7 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
 
   const ensureLandmarker = async () => {
     if (landmarker) return landmarker
-    const filesetResolver = await FilesetResolver.forVisionTasks(WASM_FILES_URL)
+    const filesetResolver = await getFilesetResolver()
     landmarker = await HandLandmarker.createFromOptions(filesetResolver, {
       baseOptions: { modelAssetPath: MODEL_URL },
       runningMode: 'VIDEO',

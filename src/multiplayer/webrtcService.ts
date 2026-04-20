@@ -12,12 +12,80 @@ import type { WebRTCConnection } from './types'
 
 const ROOMS_PATH = ['pingponghub', 'rooms', 'active'] as const
 
-const ICE_SERVERS: RTCConfiguration = {
-  iceServers: [
+let cachedIceServers: RTCConfiguration | null = null
+let cacheTimestamp: number = 0
+const CACHE_TTL_MS = 5 * 60 * 1000
+
+export function clearIceServerCache(): void {
+  cachedIceServers = null
+  cacheTimestamp = 0
+}
+
+async function fetchIceServers(): Promise<RTCConfiguration> {
+  const now = Date.now()
+  if (cachedIceServers && (now - cacheTimestamp) < CACHE_TTL_MS) {
+    return cachedIceServers
+  }
+  
+  cachedIceServers = null
+
+  const iceServers: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-  ],
-  iceCandidatePoolSize: 10,
+  ]
+
+  const apiKey = import.meta.env.VITE_METERED_API_KEY
+  const appName = import.meta.env.VITE_METERED_APP_NAME || 'frootninja'
+
+  if (apiKey) {
+    try {
+      const response = await fetch(
+        `https://${appName}.metered.live/api/v1/turn/credentials?apiKey=${apiKey}`
+      )
+      
+      if (response.ok) {
+        const turnServers = await response.json()
+        iceServers.push(...turnServers)
+      }
+    } catch {
+      // Fall back to static credentials
+    }
+  }
+  
+  // Fallback to static credentials if API failed
+  if (iceServers.length <= 2) {
+    const turnUsername = import.meta.env.VITE_TURN_USERNAME
+    const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL
+    
+    if (turnUsername && turnCredential) {
+      iceServers.push(
+        {
+          urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+          username: turnUsername,
+          credential: turnCredential,
+        },
+        {
+          urls: 'turn:global.relay.metered.ca:443?transport=tcp',
+          username: turnUsername,
+          credential: turnCredential,
+        },
+        {
+          urls: 'turn:global.relay.metered.ca:80',
+          username: turnUsername,
+          credential: turnCredential,
+        }
+      )
+    }
+  }
+
+  const config: RTCConfiguration = {
+    iceServers,
+    iceCandidatePoolSize: 10,
+  }
+
+  cachedIceServers = config
+  cacheTimestamp = Date.now()
+  return cachedIceServers
 }
 
 export async function createPeerConnection(
@@ -33,7 +101,8 @@ export async function createPeerConnection(
   const db = getDb()
   if (!db) return null
 
-  const pc = new RTCPeerConnection(ICE_SERVERS)
+  const iceConfig = await fetchIceServers()
+  const pc = new RTCPeerConnection(iceConfig)
   const unsubscribes: Unsubscribe[] = []
   let remoteStream: MediaStream | null = null
   let dataChannel: RTCDataChannel | null = null
@@ -112,16 +181,36 @@ export async function createPeerConnection(
 
   const processedCandidates = new Set<string>()
 
+  const processCandidateDoc = (docId: string, candidateData: RTCIceCandidateInit) => {
+    if (processedCandidates.has(docId)) return
+    processedCandidates.add(docId)
+    addIceCandidate(candidateData)
+  }
+
+  const pollRemoteCandidates = async () => {
+    try {
+      const snapshot = await getDocs(remoteIceCol)
+      snapshot.docs.forEach(d => {
+        processCandidateDoc(d.id, d.data() as RTCIceCandidateInit)
+      })
+    } catch {
+      // Ignore polling errors
+    }
+  }
+
+  const pollInterval = setInterval(pollRemoteCandidates, 1500)
+  setTimeout(() => clearInterval(pollInterval), 15000)
+
   const unsubIce = onSnapshot(remoteIceCol, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
-      if (change.type === 'added' && !processedCandidates.has(change.doc.id)) {
-        processedCandidates.add(change.doc.id)
+      if (change.type === 'added') {
         const candidateData = change.doc.data() as RTCIceCandidateInit
-        addIceCandidate(candidateData)
+        processCandidateDoc(change.doc.id, candidateData)
       }
     })
   })
   unsubscribes.push(unsubIce)
+  unsubscribes.push(() => clearInterval(pollInterval))
 
   try {
     if (isHost) {
