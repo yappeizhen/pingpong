@@ -476,7 +476,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         {!isWaiting && (
           <>
             <HandOverlay paddleSize={0.035} paddleColor="#ffdd00" showDebug={false} />
-            <GameHUD isMultiplayer={true} isHost={isHost} hideMenuButton={true} />
+            <GameHUD isMultiplayer={true} isHost={isHost} hideMenuButton={true} opponentName={opponent?.name} />
           </>
         )}
 

@@ -5,9 +5,10 @@ interface GameHUDProps {
   isMultiplayer?: boolean
   isHost?: boolean
   hideMenuButton?: boolean
+  opponentName?: string
 }
 
-export function GameHUD({ isMultiplayer = false, isHost = true, hideMenuButton = false }: GameHUDProps) {
+export function GameHUD({ isMultiplayer = false, isHost = true, hideMenuButton = false, opponentName: opponentNameProp }: GameHUDProps) {
   const { player1, player2, servingPlayer, rallyCount, phase, resetGame } = useGameStore()
 
   // In multiplayer, determine if it's "your turn" based on whether you're the serving player
@@ -16,10 +17,12 @@ export function GameHUD({ isMultiplayer = false, isHost = true, hideMenuButton =
   const isMyServe = servingPlayer === myPlayer
 
   // Determine display names and scores based on perspective
-  const youName = isMultiplayer ? (isHost ? player1.name : player2.name) : player1.name
+  const youName = 'You'
   const youScore = isMultiplayer ? (isHost ? player1.score : player2.score) : player1.score
-  const opponentName = isMultiplayer ? (isHost ? player2.name : player1.name) : player2.name
   const opponentScore = isMultiplayer ? (isHost ? player2.score : player1.score) : player2.score
+  
+  // Use provided opponent name in multiplayer, or fall back to store names
+  const opponentName = isMultiplayer ? (opponentNameProp || 'Opponent') : player2.name
 
   return (
     <div className="game-hud">
