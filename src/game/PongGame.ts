@@ -5,6 +5,11 @@ import type { PaddleState, Player, BallState } from '@/types'
 
 export type PointCallback = (winner: Player, reason: string) => void
 
+interface RemoteBallFrame {
+  state: BallState
+  receivedAt: number
+}
+
 export class PongGame {
   private scene: THREE.Scene
   private camera: THREE.PerspectiveCamera
@@ -29,6 +34,9 @@ export class PongGame {
   
   private isGuestMode = false
   private remoteBallState: BallState | null = null
+  private remoteBallFrames: RemoteBallFrame[] = []
+  private readonly remoteInterpolationDelayMs = 100
+  private readonly remoteMaxExtrapolationMs = 60
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -281,6 +289,9 @@ export class PongGame {
 
   serve(player: Player, seed: number) {
     this.physics.serve(player, seed)
+    if (this.isGuestMode) {
+      this.clearRemoteSync()
+    }
   }
 
   getBallState(): BallState {
@@ -296,6 +307,7 @@ export class PongGame {
 
   setGuestMode(isGuest: boolean) {
     this.isGuestMode = isGuest
+    this.clearRemoteSync()
     
     if (isGuest) {
       // Flip camera to view from opponent's side of the table
@@ -316,9 +328,21 @@ export class PongGame {
     }
   }
 
-  setRemoteBallState(state: BallState) {
-    this.remoteBallState = state
-    this.physics.setState(state)
+  setRemoteBallState(state: BallState, receivedAt = performance.now()) {
+    const copiedState = this.cloneBallState(state)
+    this.remoteBallState = copiedState
+    this.remoteBallFrames.push({ state: copiedState, receivedAt })
+
+    if (this.remoteBallFrames.length > 24) {
+      this.remoteBallFrames.splice(0, this.remoteBallFrames.length - 24)
+    }
+
+    this.physics.setState(copiedState)
+  }
+
+  clearRemoteSync() {
+    this.remoteBallFrames = []
+    this.remoteBallState = null
   }
 
   start() {
@@ -337,6 +361,9 @@ export class PongGame {
   reset() {
     this.physics.reset()
     this.ball.position.set(0, TABLE.HEIGHT + 0.2, 0)
+    if (this.isGuestMode) {
+      this.clearRemoteSync()
+    }
   }
 
   dispose() {
@@ -362,19 +389,15 @@ export class PongGame {
     const delta = Math.min((now - this.lastTime) / 1000, 0.1)
     this.lastTime = now
 
-    this.update(delta)
+    this.update(delta, now)
     this.renderer.render(this.scene, this.camera)
   }
 
-  private update(delta: number) {
+  private update(delta: number, now: number) {
     let ballState: BallState
 
-    if (this.isGuestMode && this.remoteBallState) {
-      // Guest mode: display host's authoritative ball state directly
-      ballState = this.remoteBallState
-    } else if (this.isGuestMode) {
-      // Guest mode but no remote state yet - just use current physics state
-      ballState = this.physics.getState()
+    if (this.isGuestMode) {
+      ballState = this.getGuestBallState(now)
     } else {
       const result = this.physics.update(delta, this.player1Paddle, this.player2Paddle)
 
@@ -402,6 +425,88 @@ export class PongGame {
   private updateTrajectory(_ballState: BallState) {
     // Trajectory line disabled - was confusing for players
     this.trajectoryLine.visible = false
+  }
+
+  private cloneBallState(state: BallState): BallState {
+    return {
+      position: { ...state.position },
+      velocity: { ...state.velocity },
+      spin: { ...state.spin },
+      lastHitBy: state.lastHitBy,
+      isInPlay: state.isInPlay,
+    }
+  }
+
+  private lerp(start: number, end: number, t: number): number {
+    return start + (end - start) * t
+  }
+
+  private interpolateBallState(from: BallState, to: BallState, t: number): BallState {
+    const clamped = Math.min(Math.max(t, 0), 1)
+    return {
+      position: {
+        x: this.lerp(from.position.x, to.position.x, clamped),
+        y: this.lerp(from.position.y, to.position.y, clamped),
+        z: this.lerp(from.position.z, to.position.z, clamped),
+      },
+      velocity: {
+        x: this.lerp(from.velocity.x, to.velocity.x, clamped),
+        y: this.lerp(from.velocity.y, to.velocity.y, clamped),
+        z: this.lerp(from.velocity.z, to.velocity.z, clamped),
+      },
+      spin: {
+        x: this.lerp(from.spin.x, to.spin.x, clamped),
+        y: this.lerp(from.spin.y, to.spin.y, clamped),
+      },
+      lastHitBy: to.lastHitBy ?? from.lastHitBy,
+      isInPlay: to.isInPlay,
+    }
+  }
+
+  private getGuestBallState(now: number): BallState {
+    if (this.remoteBallFrames.length === 0) {
+      return this.remoteBallState ?? this.physics.getState()
+    }
+
+    const renderTime = now - this.remoteInterpolationDelayMs
+
+    while (
+      this.remoteBallFrames.length >= 2 &&
+      this.remoteBallFrames[1].receivedAt <= renderTime
+    ) {
+      this.remoteBallFrames.shift()
+    }
+
+    if (this.remoteBallFrames.length >= 2) {
+      const from = this.remoteBallFrames[0]
+      const to = this.remoteBallFrames[1]
+      const duration = Math.max(1, to.receivedAt - from.receivedAt)
+      const t = (renderTime - from.receivedAt) / duration
+      return this.interpolateBallState(from.state, to.state, t)
+    }
+
+    const latest = this.remoteBallFrames[0]
+    if (renderTime <= latest.receivedAt) {
+      return latest.state
+    }
+
+    const dtSeconds = Math.min(
+      (renderTime - latest.receivedAt) / 1000,
+      this.remoteMaxExtrapolationMs / 1000
+    )
+
+    if (!latest.state.isInPlay || dtSeconds <= 0) {
+      return latest.state
+    }
+
+    return {
+      ...latest.state,
+      position: {
+        x: latest.state.position.x + latest.state.velocity.x * dtSeconds,
+        y: latest.state.position.y + latest.state.velocity.y * dtSeconds,
+        z: latest.state.position.z + latest.state.velocity.z * dtSeconds,
+      },
+    }
   }
 
   private handleResize = () => {

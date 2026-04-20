@@ -56,6 +56,7 @@ export interface PaddleSyncMessage {
 export interface BallSyncMessage {
   type: 'ball'
   ball: BallState
+  seq: number
   timestamp: number
 }
 

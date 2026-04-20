@@ -16,10 +16,13 @@ export class GameSyncService {
   private dataChannel: RTCDataChannel | null = null
   private messageHandlers: Set<MessageHandler> = new Set()
   private isHost: boolean = false
+  private ballSequence = 0
+  private readonly transientBackpressureLimit = 128 * 1024
 
   setDataChannel(channel: RTCDataChannel, isHost: boolean) {
     this.dataChannel = channel
     this.isHost = isHost
+    this.ballSequence = 0
 
     channel.onmessage = (event) => {
       try {
@@ -36,8 +39,19 @@ export class GameSyncService {
     return () => this.messageHandlers.delete(handler)
   }
 
+  private isTransientMessage(message: GameSyncMessage): boolean {
+    return message.type === 'ball' || message.type === 'paddle'
+  }
+
   private send(message: GameSyncMessage) {
     if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+      return
+    }
+
+    if (
+      this.isTransientMessage(message) &&
+      this.dataChannel.bufferedAmount > this.transientBackpressureLimit
+    ) {
       return
     }
 
@@ -64,6 +78,7 @@ export class GameSyncService {
     const message: BallSyncMessage = {
       type: 'ball',
       ball,
+      seq: ++this.ballSequence,
       timestamp: Date.now(),
     }
     this.send(message)

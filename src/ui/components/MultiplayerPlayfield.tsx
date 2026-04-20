@@ -28,6 +28,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const phaseRef = useRef<string>('idle')
   const servingPlayerRef = useRef<'player1' | 'player2'>('player1')
   const scoreRef = useRef({ player1: 0, player2: 0 })
+  const lastBallSeqRef = useRef(0)
 
   // Get videoRef callback from hand tracker (like frootninja)
   const { videoRef, status: handTrackerStatus } = useHandData()
@@ -64,6 +65,11 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null)
   const [showCountdown, setShowCountdown] = useState(false)
   const playerId = getPlayerId()
+
+  const resetGuestBallSync = useCallback(() => {
+    lastBallSeqRef.current = 0
+    gameRef.current?.clearRemoteSync()
+  }, [])
 
   // Handle data channel from WebRTC
   const handleDataChannel = useCallback((channel: RTCDataChannel) => {
@@ -194,13 +200,8 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         gameRef.current.setPlayer2Paddle(paddleState)
       }
       gameSyncService.sendPaddle(playerId, paddleState)
-
-      if (isHost && phase === 'playing') {
-        const ballState = gameRef.current.getBallState()
-        gameSyncService.sendBall(ballState)
-      }
     },
-    [playerId, isHost, phase]
+    [playerId, isHost]
   )
 
   useHandController({
@@ -298,13 +299,20 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
         case 'ball':
           if (!isHost && gameRef.current) {
-            gameRef.current.setRemoteBallState(message.ball)
+            if (message.seq <= lastBallSeqRef.current) {
+              break
+            }
+            lastBallSeqRef.current = message.seq
+            gameRef.current.setRemoteBallState(message.ball, performance.now())
           }
           break
 
         case 'serve':
           console.log('[MultiplayerPlayfield] Received serve message, player:', message.player, 'seed:', message.seed)
           if (gameRef.current) {
+            if (!isHost) {
+              resetGuestBallSync()
+            }
             gameRef.current.serve(message.player, message.seed)
             setServingPlayer(message.player)
             setPhase('playing')
@@ -334,6 +342,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
             
             // Reset ball for guest
             if (gameRef.current) {
+              resetGuestBallSync()
               gameRef.current.reset()
             }
           }
@@ -343,6 +352,9 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
           // Sync serving player from host
           if (message.servingPlayer) {
             setServingPlayer(message.servingPlayer)
+          }
+          if (!isHost) {
+            resetGuestBallSync()
           }
           setPhase('serving')
           break
@@ -354,7 +366,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     })
 
     return unsubscribe
-  }, [isHost, playerId, scorePoint, setPhase, setServingPlayer])
+  }, [isHost, playerId, scorePoint, setPhase, setServingPlayer, resetGuestBallSync])
 
   // Show countdown when room state changes to countdown
   useEffect(() => {
@@ -428,13 +440,16 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   // After point scored, reset and transition to serving phase
   useEffect(() => {
     if (phase === 'point-scored') {
+      if (!isHost) {
+        resetGuestBallSync()
+      }
       gameRef.current?.reset()
       const timer = setTimeout(() => {
         setPhase('serving')
       }, 2000)
       return () => clearTimeout(timer)
     }
-  }, [phase, setPhase])
+  }, [phase, setPhase, isHost, resetGuestBallSync])
 
   const handleCountdownComplete = useCallback(() => {
     setShowCountdown(false)
