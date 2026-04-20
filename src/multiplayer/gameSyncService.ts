@@ -24,17 +24,9 @@ export class GameSyncService {
       try {
         const message = JSON.parse(event.data) as GameSyncMessage
         this.messageHandlers.forEach((handler) => handler(message))
-      } catch (error) {
-        console.error('[GameSync] Failed to parse message:', error)
+      } catch {
+        // Ignore parse errors
       }
-    }
-
-    channel.onerror = (error) => {
-      console.error('[GameSync] Data channel error:', error)
-    }
-
-    channel.onclose = () => {
-      console.log('[GameSync] Data channel closed')
     }
   }
 
@@ -50,8 +42,8 @@ export class GameSyncService {
 
     try {
       this.dataChannel.send(JSON.stringify(message))
-    } catch (error) {
-      console.error('[GameSync] Failed to send message:', error)
+    } catch {
+      // Ignore send errors
     }
   }
 

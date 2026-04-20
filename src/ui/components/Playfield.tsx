@@ -64,8 +64,7 @@ export function Playfield() {
     gameRef.current = game
     aiRef.current = new AIController()
 
-    game.setOnPoint((winner, reason) => {
-      console.log(`Point for ${winner}: ${reason}`)
+    game.setOnPoint((winner) => {
       scorePoint(winner)
     })
 
@@ -170,6 +169,7 @@ export function Playfield() {
           player1Name={player1.name}
           player2Name={player2.name}
           onPlayAgain={resetGame}
+          isVictory={player1.score > player2.score}
         />
       )}
 

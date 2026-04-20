@@ -82,9 +82,6 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
     return { hands, timestamp, fps }
   }
 
-  let lastHandCount = 0
-  let frameCount = 0
-
   const detectionLoop = () => {
     if (!videoEl || !landmarker) {
       emitFrame(null)
@@ -101,16 +98,6 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
       const fps = Number.isFinite(frameDelta) && frameDelta > 0 ? 1000 / frameDelta : 0
       lastFrameTimestamp = now
       const frame = convertResultToFrame(result, now, fps)
-      
-      frameCount++
-      if (frame.hands.length !== lastHandCount) {
-        console.log('[handTracker] Hands changed:', lastHandCount, '->', frame.hands.length)
-        lastHandCount = frame.hands.length
-      }
-      if (frameCount % 60 === 0) {
-        console.log('[handTracker] Detection running, fps:', Math.round(fps), 'hands:', frame.hands.length)
-      }
-      
       emitFrame(frame)
     }
 
@@ -119,21 +106,18 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
 
   const ensureLandmarker = async () => {
     if (landmarker) return landmarker
-    console.log('[handTracker] Loading MediaPipe model...')
     const filesetResolver = await FilesetResolver.forVisionTasks(WASM_FILES_URL)
     landmarker = await HandLandmarker.createFromOptions(filesetResolver, {
       baseOptions: { modelAssetPath: MODEL_URL },
       runningMode: 'VIDEO',
       numHands: maxHands,
     })
-    console.log('[handTracker] Model loaded successfully')
     return landmarker
   }
 
   const attachCamera = async (video: HTMLVideoElement) => {
     cleanupStream()
     videoEl = video
-    console.log('[handTracker] Requesting camera access...')
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         width: { ideal: 1280 },
@@ -142,30 +126,20 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
         facingMode: 'user',
       },
     })
-    console.log('[handTracker] Camera access granted')
     mediaStream = stream
     video.srcObject = stream
     video.playsInline = true
     video.muted = true
     await video.play()
-    console.log('[handTracker] Video playing, dimensions:', video.videoWidth, 'x', video.videoHeight)
   }
 
   let isStarting = false
 
   const start = async (video: HTMLVideoElement) => {
-    console.log('[handTracker] start() called, isStarting:', isStarting, 'status:', status)
-    if (isStarting) {
-      console.log('[handTracker] Already starting, returning')
-      return
-    }
-    if (status === 'ready' && videoEl === video) {
-      console.log('[handTracker] Already ready with same video, returning')
-      return
-    }
+    if (isStarting) return
+    if (status === 'ready' && videoEl === video) return
 
     if (status === 'ready' && videoEl !== video) {
-      console.log('[handTracker] Ready but different video, re-attaching...')
       isStarting = true
       try {
         if (mediaStream && mediaStream.active) {
@@ -179,15 +153,12 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
           await attachCamera(video)
           lastVideoTime = -1
         }
-      } catch (error) {
-        console.error('[handTracker] Failed to re-attach camera:', error)
       } finally {
         isStarting = false
       }
       return
     }
 
-    console.log('[handTracker] Starting fresh initialization...')
     isStarting = true
     notifyStatus('initializing')
     try {
@@ -196,14 +167,11 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
       notifyStatus('ready')
       lastVideoTime = -1
       stopLoop()
-      console.log('[handTracker] Starting detection loop')
       rafId = requestAnimationFrame(detectionLoop)
     } catch (error) {
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
-        console.error('[handTracker] Camera permission denied')
         notifyStatus('permission-denied')
       } else {
-        console.error('[handTracker] Init failed:', error)
         notifyStatus('error')
       }
       cleanupStream()

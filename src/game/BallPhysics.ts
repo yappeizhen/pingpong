@@ -65,8 +65,6 @@ export class BallPhysics {
     }
 
     this.bouncedOnPlayerSide = { player1: false, player2: false }
-    
-    console.log(`[Physics] ${player} served: speed=${serveSpeed.toFixed(2)}, arc=${upwardVelocity.toFixed(2)}`)
   }
 
   update(
@@ -246,72 +244,57 @@ export class BallPhysics {
       this.state.lastHitBy = player
       this.bouncedOnPlayerSide = { player1: false, player2: false }
       
-      console.log(`[Physics] ${player} hit ball, speed: ${newSpeed.toFixed(2)}, angle: ${(xVelocity/newSpeed).toFixed(2)}`)
     }
   }
 
   private checkOutOfBounds(): { point?: { winner: Player; reason: string } } {
     const { position } = this.state
 
-    // Ball fell below the playing area
-    if (position.y < 0) {
-      // If ball bounced on opponent's side first, they missed - hitter wins
-      // Otherwise, hitter hit it off the table
-      const onPlayer1Side = position.z > 0
-      const onPlayer2Side = position.z < 0
-      
-      if (onPlayer2Side && this.bouncedOnPlayerSide.player2) {
-        // Ball bounced on AI's side and fell - AI missed, player1 wins
-        this.state.isInPlay = false
-        return { point: { winner: 'player1', reason: 'miss' } }
-      }
-      if (onPlayer1Side && this.bouncedOnPlayerSide.player1) {
-        // Ball bounced on player1's side and fell - player1 missed, AI wins
-        this.state.isInPlay = false
-        return { point: { winner: 'player2', reason: 'miss' } }
-      }
-      
-      // Ball fell without valid bounce - hitter's fault
+    // Ball went out sideways - detect quickly
+    if (Math.abs(position.x) > this.tableHalfWidth + 0.4) {
       const winner = this.state.lastHitBy === 'player1' ? 'player2' : 'player1'
       this.state.isInPlay = false
       return { point: { winner, reason: 'out-of-bounds' } }
     }
 
     // Ball went past the end of the table
-    if (Math.abs(position.z) > this.tableHalfLength + 1.5) {
-      const missedByPlayer1 = position.z > this.tableHalfLength + 0.5
-      const missedByPlayer2 = position.z < -this.tableHalfLength - 0.5
+    const pastPlayer1End = position.z > this.tableHalfLength + 0.5
+    const pastPlayer2End = position.z < -this.tableHalfLength - 0.5
 
-      if (missedByPlayer2) {
-        // Ball went past AI's end
-        if (this.bouncedOnPlayerSide.player2) {
-          // Valid shot that AI missed - player1 wins!
-          this.state.isInPlay = false
-          return { point: { winner: 'player1', reason: 'miss' } }
-        } else {
-          // Player1 hit it long (no bounce on AI's side) - AI wins
-          this.state.isInPlay = false
-          return { point: { winner: 'player2', reason: 'out-of-bounds' } }
-        }
+    if (pastPlayer2End) {
+      if (this.bouncedOnPlayerSide.player2) {
+        this.state.isInPlay = false
+        return { point: { winner: 'player1', reason: 'miss' } }
+      } else {
+        this.state.isInPlay = false
+        return { point: { winner: 'player2', reason: 'out-of-bounds' } }
       }
-      
-      if (missedByPlayer1) {
-        // Ball went past player1's end
-        if (this.bouncedOnPlayerSide.player1) {
-          // Valid shot that player1 missed - AI wins
-          this.state.isInPlay = false
-          return { point: { winner: 'player2', reason: 'miss' } }
-        } else {
-          // AI hit it long (no bounce on player1's side) - player1 wins
-          this.state.isInPlay = false
-          return { point: { winner: 'player1', reason: 'out-of-bounds' } }
-        }
+    }
+    
+    if (pastPlayer1End) {
+      if (this.bouncedOnPlayerSide.player1) {
+        this.state.isInPlay = false
+        return { point: { winner: 'player2', reason: 'miss' } }
+      } else {
+        this.state.isInPlay = false
+        return { point: { winner: 'player1', reason: 'out-of-bounds' } }
       }
     }
 
-    // Ball went out sideways
-    if (Math.abs(position.x) > this.tableHalfWidth + 1.0) {
-      // Hitter's fault - they hit it wide
+    // Ball fell below the playing area (and still within table Z range)
+    if (position.y < -0.2) {
+      const onPlayer1Side = position.z > 0
+      const onPlayer2Side = position.z < 0
+      
+      if (onPlayer2Side && this.bouncedOnPlayerSide.player2) {
+        this.state.isInPlay = false
+        return { point: { winner: 'player1', reason: 'miss' } }
+      }
+      if (onPlayer1Side && this.bouncedOnPlayerSide.player1) {
+        this.state.isInPlay = false
+        return { point: { winner: 'player2', reason: 'miss' } }
+      }
+      
       const winner = this.state.lastHitBy === 'player1' ? 'player2' : 'player1'
       this.state.isInPlay = false
       return { point: { winner, reason: 'out-of-bounds' } }

@@ -100,7 +100,6 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     game.setGuestMode(!isHost)
 
     game.setOnPoint((winner, reason) => {
-      console.log(`[MP] Point for ${winner}: ${reason}`)
       scorePoint(winner)
 
       if (isHost) {
@@ -150,7 +149,6 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         isHost,
         localStream,
         (remoteStream) => {
-          console.log('[MP] Received remote stream')
           setRemoteStream(remoteStream)
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream
@@ -158,7 +156,6 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
           }
         },
         (dataChannel) => {
-          console.log('[MP] Data channel ready')
           setDataChannel(dataChannel)
           gameSyncService.setDataChannel(dataChannel, isHost)
           setIsConnecting(false)
@@ -312,6 +309,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
             onPlayAgain={handlePlayAgain}
             onExit={handleExit}
             showExit
+            isVictory={isYourWin}
           />
         )}
       </div>

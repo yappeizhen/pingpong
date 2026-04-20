@@ -41,7 +41,7 @@ export function PointScoredOverlay({ scorerName, title = 'Point!' }: PointScored
 }
 
 interface GameOverOverlayProps {
-  winnerName: string
+  winnerName?: string
   score: { player1: number; player2: number }
   player1Name?: string
   player2Name?: string
@@ -49,10 +49,10 @@ interface GameOverOverlayProps {
   onExit?: () => void
   showPlayAgain?: boolean
   showExit?: boolean
+  isVictory?: boolean
 }
 
 export function GameOverOverlay({
-  winnerName,
   score,
   player1Name = 'You',
   player2Name = 'Opponent',
@@ -60,17 +60,76 @@ export function GameOverOverlay({
   onExit,
   showPlayAgain = true,
   showExit = false,
+  isVictory = true,
 }: GameOverOverlayProps) {
+  const [showContent, setShowContent] = useState(false)
+  const [showButtons, setShowButtons] = useState(false)
+
+  useEffect(() => {
+    const contentTimer = setTimeout(() => setShowContent(true), 600)
+    const buttonsTimer = setTimeout(() => setShowButtons(true), 1200)
+    return () => {
+      clearTimeout(contentTimer)
+      clearTimeout(buttonsTimer)
+    }
+  }, [])
+
+  const totalPoints = score.player1 + score.player2
+  const winMargin = Math.abs(score.player1 - score.player2)
+
   return (
-    <div className="gameover-overlay">
-      <h2 className="gameover-title">Game Over</h2>
-      <p className="gameover-winner">{winnerName} wins!</p>
-      <p className="gameover-score">
-        {player1Name}: {score.player1} - {player2Name}: {score.player2}
-      </p>
-      <div className="gameover-buttons">
+    <div className={`gameover-overlay ${isVictory ? 'victory' : 'defeat'}`}>
+      <div className="gameover-particles">
+        {isVictory && Array.from({ length: 20 }).map((_, i) => (
+          <div key={i} className="particle" style={{
+            left: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 2}s`,
+            animationDuration: `${2 + Math.random() * 2}s`,
+          }} />
+        ))}
+      </div>
+
+      <div className={`gameover-banner ${isVictory ? 'victory' : 'defeat'}`}>
+        <span className="banner-text">{isVictory ? 'VICTORY' : 'DEFEAT'}</span>
+      </div>
+
+      <div className={`gameover-content ${showContent ? 'visible' : ''}`}>
+        <div className="gameover-score-display">
+          <div className="score-side player">
+            <span className="score-label">{player1Name}</span>
+            <span className="score-value">{score.player1}</span>
+          </div>
+          <div className="score-divider">
+            <span className="vs-text">VS</span>
+          </div>
+          <div className="score-side opponent">
+            <span className="score-label">{player2Name}</span>
+            <span className="score-value">{score.player2}</span>
+          </div>
+        </div>
+
+        <div className="gameover-stats">
+          <div className="stat-item">
+            <span className="stat-value">{totalPoints}</span>
+            <span className="stat-label">Total Rallies</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-value">+{winMargin}</span>
+            <span className="stat-label">Point Margin</span>
+          </div>
+        </div>
+
+        <p className="gameover-message">
+          {isVictory 
+            ? winMargin >= 5 ? 'Dominant performance!' : 'Well played!'
+            : winMargin >= 5 ? 'Better luck next time!' : 'So close!'}
+        </p>
+      </div>
+
+      <div className={`gameover-buttons ${showButtons ? 'visible' : ''}`}>
         {showPlayAgain && onPlayAgain && (
           <button className="gameover-button primary" onClick={onPlayAgain}>
+            <span className="button-icon">↻</span>
             Play Again
           </button>
         )}

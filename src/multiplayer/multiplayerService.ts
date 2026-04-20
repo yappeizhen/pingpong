@@ -49,16 +49,10 @@ export function setPlayerName(name: string): void {
 }
 
 export async function createRoom(playerName: string): Promise<Room | null> {
-  if (!isFirebaseEnabled()) {
-    console.warn('[Multiplayer] Firebase not configured')
-    return null
-  }
+  if (!isFirebaseEnabled()) return null
 
   const db = getDb()
-  if (!db) {
-    console.error('[Multiplayer] Failed to get Firestore instance')
-    return null
-  }
+  if (!db) return null
 
   const playerId = getPlayerId()
   const roomCode = generateRoomCode()
@@ -86,14 +80,11 @@ export async function createRoom(playerName: string): Promise<Room | null> {
 
   try {
     await setDoc(doc(db, 'rooms', roomId), roomData)
-    console.log('[Multiplayer] Room created:', roomCode)
-
     return {
       id: roomId,
       ...roomData,
     }
-  } catch (error) {
-    console.error('[Multiplayer] Failed to create room:', error)
+  } catch {
     return null
   }
 }
@@ -124,8 +115,7 @@ export async function findRoomByCode(code: string): Promise<Room | null> {
       id: roomDoc.id,
       ...data,
     }
-  } catch (error) {
-    console.error('[Multiplayer] Failed to find room:', error)
+  } catch {
     return null
   }
 }
@@ -156,24 +146,15 @@ export async function joinRoom(roomId: string, playerName: string): Promise<bool
     const roomData = snapshot.data() as RoomData
     const playerCount = Object.keys(roomData.players || {}).length
 
-    if (playerCount >= 2) {
-      console.warn('[Multiplayer] Room is full')
-      return false
-    }
-
-    if (roomData.state !== 'waiting') {
-      console.warn('[Multiplayer] Room is not in waiting state')
-      return false
-    }
+    if (playerCount >= 2) return false
+    if (roomData.state !== 'waiting') return false
 
     await updateDoc(roomRef, {
       [`players.${playerId}`]: newPlayer,
     })
 
-    console.log('[Multiplayer] Joined room successfully')
     return true
-  } catch (error) {
-    console.error('[Multiplayer] Failed to join room:', error)
+  } catch {
     return false
   }
 }
@@ -197,7 +178,6 @@ export async function leaveRoom(roomId: string): Promise<void> {
 
     if (playerCount <= 1) {
       await deleteDoc(roomRef)
-      console.log('[Multiplayer] Room deleted (last player left)')
       
       try {
         const signalingCol = collection(db, 'rooms', roomId, 'signaling')
@@ -222,10 +202,9 @@ export async function leaveRoom(roomId: string): Promise<void> {
       }
 
       await updateDoc(roomRef, updates)
-      console.log('[Multiplayer] Left room')
     }
-  } catch (error) {
-    console.error('[Multiplayer] Failed to leave room:', error)
+  } catch {
+    // Ignore leave errors
   }
 }
 
@@ -246,8 +225,8 @@ export async function updateRoomState(roomId: string, state: RoomState): Promise
     }
     
     await updateDoc(roomRef, updates)
-  } catch (error) {
-    console.error('[Multiplayer] Failed to update room state:', error)
+  } catch {
+    // Ignore update errors
   }
 }
 
@@ -267,8 +246,8 @@ export async function updatePlayerScore(
       [`players.${playerId}.score`]: score,
       [`players.${playerId}.lastActivity`]: Date.now(),
     })
-  } catch (error) {
-    console.error('[Multiplayer] Failed to update score:', error)
+  } catch {
+    // Ignore score update errors
   }
 }
 
@@ -285,8 +264,8 @@ export async function setGameWinner(roomId: string, winnerId: string): Promise<v
       winnerId,
       endedAt: Date.now(),
     })
-  } catch (error) {
-    console.error('[Multiplayer] Failed to set winner:', error)
+  } catch {
+    // Ignore winner update errors
   }
 }
 
@@ -316,8 +295,7 @@ export function subscribeToRoom(
         ...data,
       })
     },
-    (error) => {
-      console.error('[Multiplayer] Room subscription error:', error)
+    () => {
       callback(null)
     }
   )
@@ -340,8 +318,8 @@ export async function setPlayerConnected(
       [`players.${playerId}.connected`]: connected,
       [`players.${playerId}.lastActivity`]: Date.now(),
     })
-  } catch (error) {
-    console.error('[Multiplayer] Failed to update connection status:', error)
+  } catch {
+    // Ignore connection status update errors
   }
 }
 
@@ -378,10 +356,7 @@ export async function cleanupStaleRooms(): Promise<void> {
     })
 
     await Promise.all(deletePromises)
-    if (deletePromises.length > 0) {
-      console.log('[Multiplayer] Cleaned up', deletePromises.length, 'stale rooms')
-    }
-  } catch (error) {
-    console.error('[Multiplayer] Failed to cleanup stale rooms:', error)
+  } catch {
+    // Ignore cleanup errors
   }
 }

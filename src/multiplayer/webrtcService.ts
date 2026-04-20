@@ -26,16 +26,10 @@ export async function createPeerConnection(
   onRemoteStream: (stream: MediaStream) => void,
   onDataChannel: (channel: RTCDataChannel) => void
 ): Promise<WebRTCConnection | null> {
-  if (!isFirebaseEnabled()) {
-    console.warn('[WebRTC] Firebase not enabled')
-    return null
-  }
+  if (!isFirebaseEnabled()) return null
 
   const db = getDb()
-  if (!db) {
-    console.error('[WebRTC] No database instance')
-    return null
-  }
+  if (!db) return null
 
   const pc = new RTCPeerConnection(ICE_SERVERS)
   const unsubscribes: Unsubscribe[] = []
@@ -50,7 +44,6 @@ export async function createPeerConnection(
   })
 
   pc.ontrack = (event) => {
-    console.log('[WebRTC] Received remote track')
     if (!remoteStream) {
       remoteStream = new MediaStream()
     }
@@ -65,7 +58,6 @@ export async function createPeerConnection(
 
   try {
     await deleteDoc(signalingDoc)
-    console.log('[WebRTC] Cleaned up old signaling data')
   } catch {
     // Doc might not exist
   }
@@ -78,14 +70,6 @@ export async function createPeerConnection(
     // Collection might not exist
   }
 
-  pc.onconnectionstatechange = () => {
-    console.log('[WebRTC] Connection state:', pc.connectionState)
-  }
-
-  pc.oniceconnectionstatechange = () => {
-    console.log('[WebRTC] ICE state:', pc.iceConnectionState)
-  }
-
   const addIceCandidate = async (candidateData: RTCIceCandidateInit) => {
     if (!remoteDescriptionSet) {
       pendingIceCandidates.push(candidateData)
@@ -94,8 +78,8 @@ export async function createPeerConnection(
     try {
       const candidate = new RTCIceCandidate(candidateData)
       await pc.addIceCandidate(candidate)
-    } catch (error) {
-      console.error('[WebRTC] Failed to add ICE candidate:', error)
+    } catch {
+      // Ignore ICE candidate errors
     }
   }
 
@@ -105,8 +89,8 @@ export async function createPeerConnection(
       try {
         const candidate = new RTCIceCandidate(candidateData)
         await pc.addIceCandidate(candidate)
-      } catch (error) {
-        console.error('[WebRTC] Failed to add queued ICE candidate:', error)
+      } catch {
+        // Ignore ICE candidate errors
       }
     }
     pendingIceCandidates.length = 0
@@ -118,8 +102,8 @@ export async function createPeerConnection(
         const candidateId = Date.now().toString()
         const candidateDoc = doc(iceCandidatesCol, candidateId)
         await setDoc(candidateDoc, event.candidate.toJSON())
-      } catch (error) {
-        console.error('[WebRTC] Failed to send ICE candidate:', error)
+      } catch {
+        // Ignore ICE candidate send errors
       }
     }
   }
@@ -145,11 +129,9 @@ export async function createPeerConnection(
       })
       
       dataChannel.onopen = () => {
-        console.log('[WebRTC] Data channel opened (host)')
         onDataChannel(dataChannel!)
       }
 
-      console.log('[WebRTC] Host creating offer...')
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
 
@@ -158,13 +140,11 @@ export async function createPeerConnection(
         sdp: offer.sdp,
         timestamp: Date.now(),
       })
-      console.log('[WebRTC] Host sent offer')
 
       const unsubAnswer = onSnapshot(remoteSigDoc, async (snapshot) => {
         const data = snapshot.data()
         if (data?.type === 'answer' && pc.signalingState === 'have-local-offer') {
           try {
-            console.log('[WebRTC] Host processing answer...')
             await pc.setRemoteDescription(
               new RTCSessionDescription({
                 type: 'answer',
@@ -172,30 +152,25 @@ export async function createPeerConnection(
               })
             )
             await flushPendingIceCandidates()
-            console.log('[WebRTC] Host connection established')
-          } catch (error) {
-            console.error('[WebRTC] Host failed to set remote description:', error)
+          } catch {
+            // Ignore description errors
           }
         }
       })
       unsubscribes.push(unsubAnswer)
     } else {
       pc.ondatachannel = (event) => {
-        console.log('[WebRTC] Received data channel (guest)')
         dataChannel = event.channel
         
         dataChannel.onopen = () => {
-          console.log('[WebRTC] Data channel opened (guest)')
           onDataChannel(dataChannel!)
         }
       }
 
-      console.log('[WebRTC] Guest waiting for offer...')
       const unsubOffer = onSnapshot(remoteSigDoc, async (snapshot) => {
         const data = snapshot.data()
         if (data?.type === 'offer' && pc.signalingState === 'stable') {
           try {
-            console.log('[WebRTC] Guest processing offer...')
             await pc.setRemoteDescription(
               new RTCSessionDescription({
                 type: 'offer',
@@ -204,7 +179,6 @@ export async function createPeerConnection(
             )
             await flushPendingIceCandidates()
 
-            console.log('[WebRTC] Guest creating answer...')
             const answer = await pc.createAnswer()
             await pc.setLocalDescription(answer)
 
@@ -213,16 +187,14 @@ export async function createPeerConnection(
               sdp: answer.sdp,
               timestamp: Date.now(),
             })
-            console.log('[WebRTC] Guest sent answer')
-          } catch (error) {
-            console.error('[WebRTC] Guest failed to process offer:', error)
+          } catch {
+            // Ignore offer processing errors
           }
         }
       })
       unsubscribes.push(unsubOffer)
     }
-  } catch (error) {
-    console.error('[WebRTC] Signaling failed:', error)
+  } catch {
     pc.close()
     return null
   }
@@ -256,8 +228,8 @@ export async function closePeerConnection(
     if (db) {
       try {
         await deleteDoc(doc(db, 'rooms', roomId, 'signaling', playerId))
-      } catch (error) {
-        console.error('[WebRTC] Failed to cleanup signaling:', error)
+      } catch {
+        // Ignore cleanup errors
       }
     }
   }
@@ -275,8 +247,7 @@ export async function getLocalMediaStream(): Promise<MediaStream | null> {
       audio: false,
     })
     return stream
-  } catch (error) {
-    console.error('[WebRTC] Failed to get local media:', error)
+  } catch {
     return null
   }
 }
