@@ -1,52 +1,38 @@
 .multiplayer-playfield {
+  position: relative;
   width: 100%;
   height: 100%;
-  display: flex;
-  background: #0a0a12;
-  position: relative;
+  max-width: 100vw;
+  max-height: 100vh;
   overflow: hidden;
+  background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+}
+
+/* Hidden video elements for tracking */
+.hidden-tracking-video {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ============================================
-   WAITING STATE - Sidebar layout
+   WAITING STATE
    ============================================ */
-.multiplayer-playfield--waiting {
-  flex-direction: row;
-}
-
 .multiplayer-playfield--waiting .game-area {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #0a0a12 0%, #1a1a2e 100%);
 }
 
 .multiplayer-playfield--waiting .game-area .game-canvas {
   display: none;
 }
 
-.multiplayer-playfield--waiting .video-sidebar {
-  display: flex;
-}
-
-.multiplayer-playfield--waiting .floating-opponent-video,
-.multiplayer-playfield--waiting .background-video {
-  display: none;
-}
-
 /* ============================================
-   PLAYING STATE - Floating video layout
+   BACKGROUND VIDEO (your camera)
    ============================================ */
-.multiplayer-playfield:not(.multiplayer-playfield--waiting) .video-sidebar {
-  display: none;
-}
-
-.multiplayer-playfield:not(.multiplayer-playfield--waiting) .floating-opponent-video,
-.multiplayer-playfield:not(.multiplayer-playfield--waiting) .background-video {
-  display: block;
-}
-
-/* Background video (your camera - subtle) */
 .background-video {
   position: absolute;
   top: 0;
@@ -55,7 +41,6 @@
   height: 100%;
   z-index: 1;
   pointer-events: none;
-  display: none;
 }
 
 .background-video video {
@@ -63,11 +48,19 @@
   height: 100%;
   object-fit: cover;
   transform: scaleX(-1);
-  opacity: 0.15;
-  filter: blur(8px) saturate(0.5);
+  opacity: 0.2;
+  filter: blur(4px) saturate(0.6);
 }
 
-/* Floating opponent video (picture-in-picture style) */
+/* During waiting - more visible background */
+.background-video--waiting video {
+  opacity: 0.4;
+  filter: blur(2px) saturate(0.8);
+}
+
+/* ============================================
+   FLOATING OPPONENT VIDEO
+   ============================================ */
 .floating-opponent-video {
   position: absolute;
   top: 1rem;
@@ -80,7 +73,15 @@
   border: 2px solid rgba(244, 67, 54, 0.4);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   z-index: 25;
-  display: none;
+  transition: all 0.3s ease;
+}
+
+/* During waiting - larger and more prominent */
+.floating-opponent-video--waiting {
+  width: 240px;
+  height: 180px;
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
 }
 
 .floating-opponent-video video {
@@ -114,47 +115,8 @@
 }
 
 /* ============================================
-   SIDEBAR (for waiting room)
+   VIDEO OVERLAY SHARED STYLES
    ============================================ */
-.video-sidebar {
-  width: 280px;
-  min-width: 280px;
-  flex-shrink: 0;
-  display: none;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
-  background: rgba(15, 15, 26, 0.95);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.video-container {
-  position: relative;
-  border-radius: 0.75rem;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.5);
-  aspect-ratio: 4 / 3;
-}
-
-.video-feed {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1);
-}
-
-.video-label {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 0.5rem 0.75rem;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-  color: white;
-  font-size: 0.8125rem;
-  font-weight: 500;
-}
-
 .video-overlay {
   position: absolute;
   inset: 0;
@@ -166,80 +128,15 @@
   font-size: 0.875rem;
 }
 
-.opponent-video {
-  flex: 1;
-  border: 2px solid rgba(244, 67, 54, 0.3);
-}
-
-.opponent-video .video-label {
-  color: #ef9a9a;
-}
-
-.local-video {
-  height: 120px;
-  flex-shrink: 0;
-  border: 2px solid rgba(255, 221, 0, 0.3);
-}
-
-.local-video .video-label {
-  color: #ffe066;
-}
-
-/* Sidebar status indicator */
-.sidebar-status {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 0.5rem;
-  margin-top: auto;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #888;
-  flex-shrink: 0;
-}
-
-.status-dot--idle,
-.status-dot--initializing {
-  background: #ffc107;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-.status-dot--connecting {
-  background: #2196f3;
-  animation: pulse 1s ease-in-out infinite;
-}
-
-.status-dot--connected {
-  background: #4caf50;
-}
-
-.status-dot--failed {
-  background: #f44336;
-}
-
-.status-text {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.8125rem;
-  font-family: 'Inter', sans-serif;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
 /* ============================================
    GAME AREA
    ============================================ */
 .game-area {
-  flex: 1;
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -295,9 +192,7 @@
    MOBILE RESPONSIVE
    ============================================ */
 @media (max-width: 900px) {
-  /* Waiting state on mobile */
-  .multiplayer-playfield--waiting {
-    flex-direction: column;
+  .multiplayer-playfield {
     min-height: 100vh;
   }
 
@@ -306,30 +201,6 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-  }
-
-  .multiplayer-playfield--waiting .video-sidebar {
-    width: 100%;
-    flex-direction: row;
-    height: 100px;
-    flex-shrink: 0;
-    border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    order: -1;
-  }
-
-  .multiplayer-playfield--waiting .video-container {
-    aspect-ratio: auto;
-    height: 100%;
-  }
-
-  .multiplayer-playfield--waiting .opponent-video {
-    flex: 2;
-  }
-
-  .multiplayer-playfield--waiting .local-video {
-    flex: 1;
-    height: auto;
   }
 
   /* Make waiting room fill the game area properly on mobile */
@@ -341,16 +212,16 @@
     overflow-y: auto;
   }
 
-  /* Playing state on mobile */
-  .multiplayer-playfield:not(.multiplayer-playfield--waiting) {
-    min-height: 100vh;
-  }
-
   .floating-opponent-video {
     width: 120px;
     height: 90px;
     top: 0.75rem;
     right: 0.75rem;
+  }
+
+  .floating-opponent-video--waiting {
+    width: 160px;
+    height: 120px;
   }
 
   .floating-opponent-video .video-label {

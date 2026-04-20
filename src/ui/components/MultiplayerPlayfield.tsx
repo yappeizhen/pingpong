@@ -502,64 +502,26 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         )}
       </div>
 
-      {/* Video sidebar - for waiting room only */}
-      <div className="video-sidebar">
-        <div className="video-container opponent-video">
-          <video
-            ref={remoteVideoRef}
-            className="video-feed"
-            playsInline
-            muted
-            autoPlay
-          />
-          <div className="video-label">
-            {opponent?.name || 'Opponent'}
-          </div>
-          {!remoteStream && (
-            <div className="video-overlay">
-              <span>{opponent ? 'Connecting...' : 'Waiting...'}</span>
-            </div>
-          )}
-        </div>
+      {/* Hidden video element for hand tracking - always mounted */}
+      <video
+        ref={handleVideoRef}
+        className="hidden-tracking-video"
+        playsInline
+        muted
+        autoPlay
+      />
 
-        <div className="video-container local-video">
-          <video
-            ref={handleVideoRef}
-            className="video-feed"
-            playsInline
-            muted
-            autoPlay
-          />
-          <div className="video-label">You</div>
-        </div>
+      {/* Hidden video for WebRTC remote stream - always mounted */}
+      <video
+        ref={remoteVideoRef}
+        className="hidden-tracking-video"
+        playsInline
+        muted
+        autoPlay
+      />
 
-        {/* Connection status in sidebar */}
-        <div className="sidebar-status">
-          <span className={`status-dot status-dot--${
-            handTrackerStatus === 'permission-denied' ? 'failed' 
-            : !localStream ? 'initializing' 
-            : connectionState
-          }`} />
-          <span className="status-text">
-            {handTrackerStatus === 'initializing'
-              ? 'Loading camera...'
-              : handTrackerStatus === 'permission-denied'
-                ? 'Camera denied'
-                : !localStream 
-                  ? 'Starting camera...'
-                  : connectionState === 'connected' 
-                    ? 'Connected' 
-                    : connectionState === 'connecting' 
-                      ? 'Connecting...'
-                      : opponent 
-                        ? 'Waiting for video...'
-                        : 'Ready'}
-          </span>
-        </div>
-      </div>
-
-      {/* Floating opponent video - for gameplay (uses same stream as sidebar) */}
-      <div className="floating-opponent-video">
+      {/* Floating opponent video - shown during both waiting and gameplay */}
+      <div className={`floating-opponent-video ${isWaiting ? 'floating-opponent-video--waiting' : ''}`}>
         <video
           className="video-feed"
           playsInline
@@ -575,13 +537,13 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         <div className="video-label">{opponent?.name || 'Opponent'}</div>
         {!remoteStream && (
           <div className="video-overlay">
-            <span>Connecting...</span>
+            <span>{opponent ? 'Connecting...' : 'Waiting for opponent...'}</span>
           </div>
         )}
       </div>
 
-      {/* Background video (your camera - subtle ambient) */}
-      <div className="background-video">
+      {/* Background video (your camera) - shown during both waiting and gameplay */}
+      <div className={`background-video ${isWaiting ? 'background-video--waiting' : ''}`}>
         <video
           playsInline
           muted

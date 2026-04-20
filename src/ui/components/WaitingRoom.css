@@ -38,8 +38,14 @@
   flex-direction: column;
   align-items: center;
   gap: 1.5rem;
-  max-width: 400px;
+  max-width: 420px;
   width: 100%;
+  padding: 2rem;
+  background: rgba(15, 15, 26, 0.65);
+  backdrop-filter: blur(16px);
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.3);
 }
 
 .waiting-icon {

@@ -66,7 +66,7 @@ export function useMultiplayerRoom() {
       }
       return null
     },
-    []
+    [store]
   )
 
   const handleJoinRoom = useCallback(
@@ -86,7 +86,7 @@ export function useMultiplayerRoom() {
       }
       return false
     },
-    []
+    [store]
   )
 
   const handleLeaveRoom = useCallback(async () => {

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { TABLE, BALL, PADDLE, CAMERA, PHYSICS } from './constants'
+import { TABLE, BALL, PADDLE, CAMERA } from './constants'
 import { BallPhysics } from './BallPhysics'
 import type { PaddleState, Player, BallState } from '@/types'
 
@@ -379,35 +379,9 @@ export class PongGame {
     this.updateTrajectory(ballState)
   }
 
-  private updateTrajectory(ballState: BallState) {
-    // Trajectory line disabled - was confusing
+  private updateTrajectory(_ballState: BallState) {
+    // Trajectory line disabled - was confusing for players
     this.trajectoryLine.visible = false
-    if (!ballState.isInPlay) {
-      return
-    }
-
-    return // Skip trajectory rendering
-    const positions = this.trajectoryLine.geometry.attributes.position as THREE.BufferAttribute
-
-    let pos = { ...ballState.position }
-    let vel = { ...ballState.velocity }
-    const dt = 0.02
-
-    for (let i = 0; i < 60; i++) {
-      positions.setXYZ(i, pos.x, pos.y, pos.z)
-
-      vel.y += PHYSICS.GRAVITY * dt
-      pos.x += vel.x * dt
-      pos.y += vel.y * dt
-      pos.z += vel.z * dt
-
-      if (pos.y < TABLE.HEIGHT) {
-        pos.y = TABLE.HEIGHT
-        vel.y = -vel.y * BALL.BOUNCE_COEFFICIENT
-      }
-    }
-
-    positions.needsUpdate = true
   }
 
   private handleResize = () => {

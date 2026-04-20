@@ -139,7 +139,9 @@ export function Playfield() {
 
   return (
     <div className="playfield">
-      <video ref={videoRef} className="webcam-feed" playsInline muted />
+      {/* Video element: visible as background AND feeds hand tracker */}
+      <video ref={videoRef} className="video-background" playsInline muted autoPlay />
+      
       <canvas ref={canvasRef} className="game-canvas" />
       <HandOverlay paddleSize={0.035} paddleColor="#ffdd00" showDebug={false} />
       <GameHUD />

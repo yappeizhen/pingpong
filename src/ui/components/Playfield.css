@@ -8,7 +8,8 @@
   background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
 }
 
-.webcam-feed {
+/* Video element: visible as background AND feeds hand tracker */
+.playfield > .video-background {
   position: absolute;
   top: 0;
   left: 0;
@@ -16,8 +17,10 @@
   height: 100%;
   object-fit: cover;
   transform: scaleX(-1);
-  opacity: 0.3;
+  opacity: 0.25;
+  filter: blur(4px) saturate(0.6);
   z-index: 0;
+  pointer-events: none;
 }
 
 .game-canvas {
