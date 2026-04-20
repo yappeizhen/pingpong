@@ -14,10 +14,15 @@ const getFilesetResolver = async (): Promise<WasmFilesetType> => {
   if (globalFilesetResolver) return globalFilesetResolver
   if (filesetResolverPromise) return filesetResolverPromise
   
-  filesetResolverPromise = FilesetResolver.forVisionTasks(WASM_FILES_URL).then(resolver => {
-    globalFilesetResolver = resolver
-    return resolver
-  })
+  filesetResolverPromise = FilesetResolver.forVisionTasks(WASM_FILES_URL)
+    .then(resolver => {
+      globalFilesetResolver = resolver
+      return resolver
+    })
+    .catch(error => {
+      filesetResolverPromise = null
+      throw error
+    })
   
   return filesetResolverPromise
 }
@@ -132,8 +137,17 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
   }
 
   const attachCamera = async (video: HTMLVideoElement) => {
-    cleanupStream()
     videoEl = video
+    
+    // Check if video already has a stream (e.g., from WebRTC)
+    const existingStream = video.srcObject as MediaStream | null
+    if (existingStream && existingStream.active && existingStream.getVideoTracks().length > 0) {
+      mediaStream = existingStream
+      return
+    }
+    
+    // Only get new stream if video doesn't have one
+    cleanupStream()
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         width: { ideal: 1280 },
@@ -158,7 +172,13 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
     if (status === 'ready' && videoEl !== video) {
       isStarting = true
       try {
-        if (mediaStream && mediaStream.active) {
+        // Check if video already has a working stream
+        const existingStream = video.srcObject as MediaStream | null
+        if (existingStream && existingStream.active) {
+          videoEl = video
+          mediaStream = existingStream
+          lastVideoTime = -1
+        } else if (mediaStream && mediaStream.active) {
           video.srcObject = mediaStream
           video.playsInline = true
           video.muted = true
