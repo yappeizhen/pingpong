@@ -50,7 +50,10 @@ export function GameHUD({ isMultiplayer = false, isHost = true, hideMenuButton =
 
       {phase === 'serving' && (
         <div className="hud-message">
-          {isMyServe ? 'Your serve - Swipe to serve!' : 'Opponent serving...'}
+          {isMultiplayer
+            ? (isMyServe ? 'Your serve - Get ready!' : 'Opponent serving...')
+            : (isMyServe ? 'Your serve - Swipe to serve!' : 'Opponent serving...')
+          }
         </div>
       )}
     </div>

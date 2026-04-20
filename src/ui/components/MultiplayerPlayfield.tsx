@@ -25,8 +25,6 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const gameRef = useRef<PongGame | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
-  const serveTriggeredRef = useRef(false)
-  const triggerServeRef = useRef<(() => void) | null>(null)
   const phaseRef = useRef<string>('idle')
   const servingPlayerRef = useRef<'player1' | 'player2'>('player1')
 
@@ -199,21 +197,8 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         const ballState = gameRef.current.getBallState()
         gameSyncService.sendBall(ballState)
       }
-
-      // Swipe to serve - detect if it's the player's turn and they're swiping
-      if (state.isSwinging && state.swipeSpeed > 0.3) {
-        const myPlayer = isHost ? 'player1' : 'player2'
-        const isMyServe = servingPlayer === myPlayer
-        console.log('[MultiplayerPlayfield] Swipe detected! phase:', phase, 'isMyServe:', isMyServe, 'myPlayer:', myPlayer, 'servingPlayer:', servingPlayer, 'serveTriggered:', serveTriggeredRef.current)
-
-        if (phase === 'serving' && isMyServe && !serveTriggeredRef.current) {
-          console.log('[MultiplayerPlayfield] Triggering serve!')
-          serveTriggeredRef.current = true
-          triggerServeRef.current?.()
-        }
-      }
     },
-    [playerId, isHost, phase, servingPlayer]
+    [playerId, isHost, phase]
   )
 
   useHandController({
@@ -395,48 +380,39 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     }
   }, [roomState, videoElement, remoteStream])
 
-  // Execute the actual serve (host only)
-  const executeServe = useCallback(() => {
+  // Execute the actual serve (host only, called automatically)
+  const doServe = useCallback(() => {
     if (!gameRef.current || !isHost) return
     
     const serveSeed = Date.now()
-    console.log('[MultiplayerPlayfield] Host executing serve, player:', servingPlayer, 'seed:', serveSeed)
-    gameRef.current.serve(servingPlayer, serveSeed)
-    gameSyncService.sendServe(servingPlayer, serveSeed)
+    gameRef.current.serve(servingPlayerRef.current, serveSeed)
+    gameSyncService.sendServe(servingPlayerRef.current, serveSeed)
     setPhase('playing')
-    serveTriggeredRef.current = false
-  }, [servingPlayer, isHost, setPhase])
+  }, [isHost, setPhase])
 
-  // Called when a player swipes to trigger a serve
-  const triggerServe = useCallback(() => {
-    console.log('[MultiplayerPlayfield] triggerServe called, isHost:', isHost, 'servingPlayer:', servingPlayer)
-    
-    if (isHost) {
-      // Host is serving - execute immediately
-      executeServe()
-    } else {
-      // Guest is serving - send request to host
-      console.log('[MultiplayerPlayfield] Guest sending serve request')
-      gameSyncService.sendServeRequest()
-    }
-  }, [isHost, servingPlayer, executeServe])
-
-  // Keep ref in sync for use in callback
-  triggerServeRef.current = triggerServe
-
-  // Reset serve trigger flag when phase changes to serving
+  // Auto-serve when phase changes to 'serving'
   useEffect(() => {
-    if (phase === 'serving') {
-      serveTriggeredRef.current = false
-    }
-  }, [phase])
+    if (phase !== 'serving') return
+    
+    // Small delay before auto-serve for visual feedback
+    const timer = setTimeout(() => {
+      if (isHost) {
+        // Host always executes the serve
+        doServe()
+      } else {
+        // Guest sends serve request to host
+        gameSyncService.sendServeRequest()
+      }
+    }, 500)
+    
+    return () => clearTimeout(timer)
+  }, [phase, isHost, doServe])
 
-  // After point scored, transition to serving phase (player will swipe to serve)
+  // After point scored, reset and transition to serving phase
   useEffect(() => {
     if (phase === 'point-scored') {
       gameRef.current?.reset()
       const timer = setTimeout(() => {
-        console.log('[MultiplayerPlayfield] Point scored, transitioning to serving phase')
         setPhase('serving')
       }, 2000)
       return () => clearTimeout(timer)
@@ -444,7 +420,6 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   }, [phase, setPhase])
 
   const handleCountdownComplete = useCallback(() => {
-    console.log('[MultiplayerPlayfield] Countdown complete, transitioning to serving phase')
     setShowCountdown(false)
     setPhase('serving')
   }, [setPhase])
