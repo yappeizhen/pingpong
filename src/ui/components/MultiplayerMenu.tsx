@@ -1,21 +1,18 @@
 import { useState, useCallback } from 'react'
 import { useMultiplayerRoom } from '@/multiplayer'
 import { getPlayerName, setPlayerName } from '@/multiplayer/multiplayerService'
-import { MultiplayerPlayfield } from './MultiplayerPlayfield'
 import './MultiplayerMenu.css'
 
 interface MultiplayerMenuProps {
   onBack: () => void
 }
 
-type MenuView = 'menu' | 'create' | 'join' | 'waiting'
+type MenuView = 'menu' | 'create' | 'join'
 
 export function MultiplayerMenu({ onBack }: MultiplayerMenuProps) {
   const {
-    roomCode,
     createRoom,
     joinRoom,
-    leaveRoom,
   } = useMultiplayerRoom()
 
   const [view, setView] = useState<MenuView>('menu')
@@ -35,11 +32,10 @@ export function MultiplayerMenu({ onBack }: MultiplayerMenuProps) {
     setError(null)
 
     const code = await createRoom(playerName.trim())
-    if (code) {
-      setView('waiting')
-    } else {
+    if (!code) {
       setError('Failed to create room. Check your connection and Firebase config.')
     }
+    // If successful, roomId is set in store and App.tsx will render MultiplayerPlayfield
     setIsLoading(false)
   }, [playerName, createRoom])
 
@@ -59,20 +55,12 @@ export function MultiplayerMenu({ onBack }: MultiplayerMenuProps) {
     setError(null)
 
     const success = await joinRoom(joinCode.toUpperCase(), playerName.trim())
-    if (success) {
-      setView('waiting')
-    } else {
+    if (!success) {
       setError('Room not found or full. Check the code and try again.')
     }
+    // If successful, roomId is set in store and App.tsx will render MultiplayerPlayfield
     setIsLoading(false)
   }, [playerName, joinCode, joinRoom])
-
-  const handleLeave = useCallback(async () => {
-    await leaveRoom()
-    setView('menu')
-    setJoinCode('')
-    setError(null)
-  }, [leaveRoom])
 
   const handleBack = useCallback(() => {
     if (view === 'menu') {
@@ -83,11 +71,6 @@ export function MultiplayerMenu({ onBack }: MultiplayerMenuProps) {
       setError(null)
     }
   }, [view, onBack])
-
-  // Once we have a room, stay in MultiplayerPlayfield (which handles waiting room as overlay)
-  if (roomCode || view === 'waiting') {
-    return <MultiplayerPlayfield onExit={handleLeave} />
-  }
 
   if (view === 'create') {
     return (
