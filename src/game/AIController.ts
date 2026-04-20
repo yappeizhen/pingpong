@@ -1,43 +1,19 @@
 import { TABLE, PHYSICS, BALL } from './constants'
 import type { BallState, PaddleState } from '@/types'
 
-interface AIConfig {
-  reactionDelay: number
-  speed: number
-  predictionError: number
-  anticipation: number
-  aggression: number
-}
-
-const DIFFICULTY_PRESETS: Record<string, AIConfig> = {
-  easy: {
-    reactionDelay: 200,
-    speed: 0.04,
-    predictionError: 0.12,
-    anticipation: 0.2,
-    aggression: 0.3,
-  },
-  medium: {
-    reactionDelay: 50,
-    speed: 0.08,
-    predictionError: 0.04,
-    anticipation: 0.6,
-    aggression: 0.5,
-  },
-  hard: {
-    reactionDelay: 15,
-    speed: 0.14,
-    predictionError: 0.01,
-    anticipation: 0.85,
-    aggression: 0.7,
-  },
-}
+const AI_CONFIG = {
+  reactionDelay: 5,
+  speed: 0.24,
+  predictionError: 0.002,
+  anticipation: 0.95,
+  aggression: 0.85,
+  trackingAccuracy: 0.99,
+} as const
 
 export class AIController {
-  private config: AIConfig
   private targetX: number = 0.5
   private targetY: number = 0.5
-  private targetDepth: number = 0 // 0 = baseline, positive = forward towards net
+  private targetDepth: number = 0
   private lastUpdateTime: number = 0
   private currentPaddle: PaddleState & { depth: number } = {
     position: { x: 0.5, y: 0.5 },
@@ -50,43 +26,40 @@ export class AIController {
   }
   private lastBallZ: number = 0
   private rallyCount: number = 0
-  private returnAimX: number = 0 // Where AI aims its return (-1 to 1)
-
-  constructor(difficulty: 'easy' | 'medium' | 'hard' = 'hard') {
-    this.config = DIFFICULTY_PRESETS[difficulty]
-  }
+  private returnAimX: number = 0
+  private lastBallState: BallState | null = null
 
   update(ballState: BallState, deltaTime: number): PaddleState & { depth: number } {
     const now = performance.now()
 
-    // Track rally for adaptive positioning
     if (ballState.isInPlay && ballState.velocity.z > 0 && this.lastBallZ <= 0) {
       this.rallyCount++
-      // Vary return aim each rally
-      this.returnAimX = (Math.random() - 0.5) * this.config.aggression
+      this.returnAimX = (Math.random() - 0.5) * AI_CONFIG.aggression * 1.5
     }
     this.lastBallZ = ballState.velocity.z
 
-    // Update target more frequently for better tracking
-    if (now - this.lastUpdateTime > this.config.reactionDelay) {
+    const ballChanged = !this.lastBallState || 
+      Math.abs(ballState.position.x - this.lastBallState.position.x) > 0.01 ||
+      Math.abs(ballState.position.z - this.lastBallState.position.z) > 0.01
+    this.lastBallState = { ...ballState }
+
+    if (now - this.lastUpdateTime > AI_CONFIG.reactionDelay || ballChanged) {
       this.lastUpdateTime = now
       this.calculateTarget(ballState)
     }
 
     this.moveTowardsTarget(deltaTime, ballState)
 
-    // Adjust swing speed based on ball speed and aggression
     const ballSpeed = Math.sqrt(
       ballState.velocity.x ** 2 + ballState.velocity.y ** 2 + ballState.velocity.z ** 2
     )
-    this.currentPaddle.swipeSpeed = 0.4 + this.config.aggression * 0.4 + Math.min(ballSpeed * 0.05, 0.3)
+    this.currentPaddle.swipeSpeed = 0.5 + AI_CONFIG.aggression * 0.5 + Math.min(ballSpeed * 0.06, 0.4)
 
     return { ...this.currentPaddle }
   }
 
   private calculateTarget(ball: BallState) {
     if (!ball.isInPlay) {
-      // Return to center when not in play
       this.targetX = 0.5
       this.targetY = 0.5
       this.targetDepth = 0
@@ -97,35 +70,43 @@ export class AIController {
     const ballMovingTowardsAI = ball.velocity.z < 0
 
     if (ballMovingTowardsAI) {
-      // Ball coming towards AI - predict and intercept
-      const predictedPos = this.predictBallPosition(ball)
+      const prediction = this.predictBallTrajectory(ball)
+
+      const error = (Math.random() - 0.5) * 2 * AI_CONFIG.predictionError
       
-      // Small random error based on difficulty
-      const error = (Math.random() - 0.5) * 2 * this.config.predictionError
-      this.targetX = Math.max(0.1, Math.min(0.9, predictedPos.x + error))
-      this.targetY = Math.max(0.2, Math.min(0.8, predictedPos.y + error * 0.3))
+      const blendFactor = AI_CONFIG.trackingAccuracy
+      const directX = 0.5 + (ball.position.x / TABLE.WIDTH)
+      const predictedX = prediction.x
       
-      // Move forward for short balls, back for deep balls
-      const predictedDepth = predictedPos.depth
-      this.targetDepth = Math.max(-0.3, Math.min(0.4, predictedDepth))
+      this.targetX = Math.max(0.05, Math.min(0.95, 
+        predictedX * blendFactor + directX * (1 - blendFactor) + error
+      ))
+      this.targetY = Math.max(0.15, Math.min(0.85, prediction.y + error * 0.2))
+      
+      const distanceToIntercept = Math.abs(ball.position.z - prediction.z)
+      const timeToIntercept = distanceToIntercept / Math.max(Math.abs(ball.velocity.z), 0.5)
+      
+      if (timeToIntercept < 0.3) {
+        this.targetDepth = Math.max(-0.2, Math.min(0.5, prediction.depth + 0.1))
+      } else {
+        this.targetDepth = 0.05
+      }
     } else {
-      // Ball going away - anticipate return position
       const anticipatedX = this.anticipateReturnPosition(ball)
-      this.targetX = 0.5 + (anticipatedX - 0.5) * this.config.anticipation
+      this.targetX = 0.5 + (anticipatedX - 0.5) * AI_CONFIG.anticipation
       this.targetY = 0.4
-      this.targetDepth = 0.1 // Slightly forward, ready to move
+      this.targetDepth = 0.1
     }
   }
 
-  private predictBallPosition(ball: BallState): { x: number; y: number; depth: number } {
+  private predictBallTrajectory(ball: BallState): { x: number; y: number; z: number; depth: number } {
     const tableHalfLength = TABLE.LENGTH / 2
     const baselineZ = -tableHalfLength - 0.15
 
     if (ball.velocity.z >= 0) {
-      return { x: 0.5, y: 0.5, depth: 0 }
+      return { x: 0.5, y: 0.5, z: baselineZ, depth: 0 }
     }
 
-    // Simulate ball trajectory with bounces
     let simX = ball.position.x
     let simY = ball.position.y
     let simZ = ball.position.z
@@ -133,81 +114,84 @@ export class AIController {
     let velY = ball.velocity.y
     let velZ = ball.velocity.z
 
-    const dt = 0.016 // 60fps simulation
+    const dt = 0.008
     const tableHalfWidth = TABLE.WIDTH / 2
     let steps = 0
-    const maxSteps = 400
-    let interceptZ = baselineZ
+    const maxSteps = 600
+    let bestIntercept = { x: simX, y: simY, z: baselineZ, depth: 0 }
     let foundIntercept = false
 
-    // First pass: find where ball will be at hittable height on AI side
-    while (steps < maxSteps && !foundIntercept) {
-      // Apply physics
+    while (steps < maxSteps && simZ > baselineZ - 0.5) {
       velY += PHYSICS.GRAVITY * dt
-      velX *= PHYSICS.AIR_RESISTANCE
-      velY *= PHYSICS.AIR_RESISTANCE
-      velZ *= PHYSICS.AIR_RESISTANCE
+      velX *= Math.pow(PHYSICS.AIR_RESISTANCE, dt * 60)
+      velY *= Math.pow(PHYSICS.AIR_RESISTANCE, dt * 60)
+      velZ *= Math.pow(PHYSICS.AIR_RESISTANCE, dt * 60)
 
       simX += velX * dt
       simY += velY * dt
       simZ += velZ * dt
 
-      // Table bounce
-      if (simY <= TABLE.HEIGHT + BALL.RADIUS && velY < 0) {
+      if (simY <= TABLE.HEIGHT + BALL.RADIUS && velY < 0 && 
+          simZ > -tableHalfLength && simZ < tableHalfLength &&
+          Math.abs(simX) < tableHalfWidth) {
         simY = TABLE.HEIGHT + BALL.RADIUS
         velY = -velY * BALL.BOUNCE_COEFFICIENT
         velX *= PHYSICS.TABLE_FRICTION
         velZ *= PHYSICS.TABLE_FRICTION
       }
 
-      // Check if ball is in AI's hitting zone (behind net, at hittable height)
-      const inAIZone = simZ < -0.1 && simZ > -tableHalfLength - 0.5
-      const atHittableHeight = simY > TABLE.HEIGHT && simY < TABLE.HEIGHT + 0.5
+      const inAIZone = simZ < -0.05 && simZ > baselineZ - 0.4
+      const atHittableHeight = simY > TABLE.HEIGHT - 0.05 && simY < TABLE.HEIGHT + 0.6
       
-      if (inAIZone && atHittableHeight && velZ < 0) {
-        interceptZ = simZ
+      if (inAIZone && atHittableHeight && velZ < 0 && !foundIntercept) {
+        bestIntercept = {
+          x: simX,
+          y: simY,
+          z: simZ,
+          depth: (baselineZ - simZ) / tableHalfLength
+        }
         foundIntercept = true
       }
 
-      // Ball passed baseline - use final position
-      if (simZ < baselineZ - 0.3) {
-        interceptZ = Math.max(simZ, baselineZ - 0.3)
+      if (simZ < baselineZ - 0.3 && !foundIntercept) {
+        bestIntercept = {
+          x: simX,
+          y: Math.max(TABLE.HEIGHT, simY),
+          z: simZ,
+          depth: Math.max(-0.3, (baselineZ - simZ) / tableHalfLength)
+        }
         break
       }
 
       steps++
     }
 
-    // Clamp to table bounds
-    simX = Math.max(-tableHalfWidth, Math.min(tableHalfWidth, simX))
-    simY = Math.max(TABLE.HEIGHT, Math.min(TABLE.HEIGHT + 0.5, simY))
+    bestIntercept.x = Math.max(-tableHalfWidth, Math.min(tableHalfWidth, bestIntercept.x))
+    bestIntercept.y = Math.max(TABLE.HEIGHT, Math.min(TABLE.HEIGHT + 0.5, bestIntercept.y))
 
-    // Normalize to 0-1 range
-    const normalizedX = 0.5 + (simX / TABLE.WIDTH)
-    const normalizedY = Math.max(0.15, Math.min(0.85, (simY - TABLE.HEIGHT) / 0.4))
-    
-    // Depth: how far forward from baseline (positive = closer to net)
-    const depth = (baselineZ - interceptZ) / tableHalfLength
+    const normalizedX = 0.5 + (bestIntercept.x / TABLE.WIDTH)
+    const normalizedY = Math.max(0.15, Math.min(0.85, (bestIntercept.y - TABLE.HEIGHT) / 0.4))
 
-    return { x: normalizedX, y: normalizedY, depth }
+    return { 
+      x: normalizedX, 
+      y: normalizedY, 
+      z: bestIntercept.z,
+      depth: bestIntercept.depth 
+    }
   }
 
   private anticipateReturnPosition(ball: BallState): number {
-    // Predict where opponent might return the ball
-    // Based on ball position and typical return patterns
     const ballNormX = 0.5 + (ball.position.x / TABLE.WIDTH)
     
-    // Anticipate cross-court or down-the-line returns
-    if (this.rallyCount > 2) {
-      // After a few rallies, anticipate more
-      return 0.5 + (0.5 - ballNormX) * 0.3
+    if (this.rallyCount > 1) {
+      return 0.5 + (0.5 - ballNormX) * 0.4 * AI_CONFIG.anticipation
     }
     
     return 0.5
   }
 
   private moveTowardsTarget(deltaTime: number, ball: BallState) {
-    const speed = this.config.speed * deltaTime * 60
+    const baseSpeed = AI_CONFIG.speed * deltaTime * 60
 
     const dx = this.targetX - this.currentPaddle.position.x
     const dy = this.targetY - this.currentPaddle.position.y
@@ -215,31 +199,36 @@ export class AIController {
 
     const distance = Math.sqrt(dx * dx + dy * dy + dDepth * dDepth)
 
-    if (distance > 0.005) {
-      // Urgency increases when ball is close and coming fast
+    if (distance > 0.003) {
       const ballApproaching = ball.velocity.z < 0
       const ballDistance = ballApproaching ? Math.abs(ball.position.z + TABLE.LENGTH / 2) : 1
-      const urgency = Math.min(1.5, distance * 6 + (ballApproaching ? 0.5 / Math.max(ballDistance, 0.3) : 0))
-      const adjustedSpeed = speed * (0.6 + urgency * 0.6)
+      const ballSpeed = Math.sqrt(ball.velocity.x ** 2 + ball.velocity.y ** 2 + ball.velocity.z ** 2)
       
-      const moveX = (dx / distance) * Math.min(adjustedSpeed, Math.abs(dx))
-      const moveY = (dy / distance) * Math.min(adjustedSpeed, Math.abs(dy))
-      const moveDepth = (dDepth / distance) * Math.min(adjustedSpeed * 0.7, Math.abs(dDepth))
+      let urgency = 1.0
+      if (ballApproaching) {
+        urgency = 1.0 + Math.min(2.0, (0.8 / Math.max(ballDistance, 0.2)) + ballSpeed * 0.15)
+      }
+      
+      const adjustedSpeed = baseSpeed * urgency
+      
+      const moveX = (dx / distance) * Math.min(adjustedSpeed, Math.abs(dx) * 1.5)
+      const moveY = (dy / distance) * Math.min(adjustedSpeed, Math.abs(dy) * 1.5)
+      const moveDepth = (dDepth / distance) * Math.min(adjustedSpeed * 0.8, Math.abs(dDepth) * 1.5)
 
       this.currentPaddle.position = {
-        x: Math.max(0.05, Math.min(0.95, this.currentPaddle.position.x + moveX)),
-        y: Math.max(0.1, Math.min(0.9, this.currentPaddle.position.y + moveY)),
+        x: Math.max(0.03, Math.min(0.97, this.currentPaddle.position.x + moveX)),
+        y: Math.max(0.08, Math.min(0.92, this.currentPaddle.position.y + moveY)),
       }
-      this.currentPaddle.depth = Math.max(-0.3, Math.min(0.4, this.currentPaddle.depth + moveDepth))
+      this.currentPaddle.depth = Math.max(-0.3, Math.min(0.5, this.currentPaddle.depth + moveDepth))
     }
 
-    // Set velocity for potential ball influence
     this.currentPaddle.velocity = {
-      x: this.returnAimX * this.config.aggression,
+      x: this.returnAimX * AI_CONFIG.aggression,
       y: 0,
     }
 
     this.currentPaddle.isActive = true
+    this.currentPaddle.isSwinging = true
   }
 
   reset() {
@@ -252,5 +241,6 @@ export class AIController {
     this.rallyCount = 0
     this.lastBallZ = 0
     this.returnAimX = 0
+    this.lastBallState = null
   }
 }

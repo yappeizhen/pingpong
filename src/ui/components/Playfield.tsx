@@ -62,7 +62,7 @@ export function Playfield() {
 
     const game = new PongGame(canvasRef.current)
     gameRef.current = game
-    aiRef.current = new AIController('hard')
+    aiRef.current = new AIController()
 
     game.setOnPoint((winner, reason) => {
       console.log(`Point for ${winner}: ${reason}`)

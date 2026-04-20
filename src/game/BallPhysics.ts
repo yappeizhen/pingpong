@@ -206,24 +206,31 @@ export class BallPhysics {
           this.state.velocity.z ** 2
       )
       
-      // AI gets better returns based on its swing speed
+      // Swipe speed adds extra power on top of baseline
       const swingBoost = player === 'player1' 
-        ? Math.min(paddle.swipeSpeed * 8, 0.8) 
+        ? Math.min(paddle.swipeSpeed * 12, 1.5)  // Moderate swing influence
         : Math.min(paddle.swipeSpeed * 6, 1.2)
+      
+      // Baseline speed - consistent with original
       const baseSpeed = Math.max(incomingSpeed * 0.85, 2.4)
       const newSpeed = Math.min(baseSpeed + 0.6 + swingBoost, BALL.MAX_SPEED)
 
-      // AI uses its velocity to aim returns
-      const paddleVelInfluence = player === 'player1' ? 0.2 : 0.5
-      const aimX = paddle.velocity.x * paddleVelInfluence
-      
+      // Where ball hit on paddle (-1 to 1, left to right)
       const offsetX = dx / hitZone
       const offsetY = dy / hitZone
-
-      // AI aims with intention, player uses natural swing
-      const xVelocity = player === 'player2'
-        ? (aimX + offsetX * 0.2) * newSpeed * 0.8
-        : (offsetX * 0.25 + aimX * 0.8) * newSpeed
+      
+      // Paddle swing direction influences angle
+      const aimX = paddle.velocity.x * (player === 'player1' ? 0.4 : 0.5)
+      
+      let xVelocity: number
+      if (player === 'player1') {
+        // Player angle: combination of swing direction and paddle offset
+        // Swing direction has moderate influence, offset adds natural angle
+        xVelocity = (offsetX * 0.4 + aimX * 0.6) * newSpeed
+      } else {
+        // AI aims with intention
+        xVelocity = (aimX + offsetX * 0.2) * newSpeed * 0.8
+      }
 
       this.state.velocity = {
         x: xVelocity,
@@ -239,7 +246,7 @@ export class BallPhysics {
       this.state.lastHitBy = player
       this.bouncedOnPlayerSide = { player1: false, player2: false }
       
-      console.log(`[Physics] ${player} hit ball, speed: ${newSpeed.toFixed(2)}, swingBoost: ${swingBoost.toFixed(2)}`)
+      console.log(`[Physics] ${player} hit ball, speed: ${newSpeed.toFixed(2)}, angle: ${(xVelocity/newSpeed).toFixed(2)}`)
     }
   }
 
