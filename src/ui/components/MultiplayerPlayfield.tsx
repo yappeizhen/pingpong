@@ -368,9 +368,9 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     }
   }, [roomState])
 
-  // Start serving when room state changes to playing
+  // Start serving when room state changes to playing (only on initial transition)
   useEffect(() => {
-    if (roomState === 'playing' && phase !== 'playing' && phase !== 'serving') {
+    if (roomState === 'playing' && phase !== 'playing' && phase !== 'serving' && phase !== 'point-scored' && phase !== 'game-over') {
       console.log('[MultiplayerPlayfield] Room state changed to playing, starting serve')
       setPhase('serving')
     }
