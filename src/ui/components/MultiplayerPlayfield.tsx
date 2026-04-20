@@ -300,8 +300,19 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     return unsubscribe
   }, [isHost, playerId, scorePoint, setPhase])
 
+  // Show countdown when room state changes to countdown
+  useEffect(() => {
+    if (roomState === 'countdown') {
+      console.log('[MultiplayerPlayfield] Room state changed to countdown, showing countdown overlay')
+      setShowCountdown(true)
+      setIsConnecting(false)
+    }
+  }, [roomState])
+
+  // Start serving when room state changes to playing
   useEffect(() => {
     if (roomState === 'playing' && phase !== 'playing' && phase !== 'serving') {
+      console.log('[MultiplayerPlayfield] Room state changed to playing, starting serve')
       setPhase('serving')
     }
   }, [roomState, phase, setPhase])
@@ -350,20 +361,40 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     (player1.score > player2.score && isHost) ||
     (player2.score > player1.score && !isHost)
 
-  // Show waiting room with hidden video element to initialize camera/WebRTC early
+  // Show waiting room with video preview - keep both video elements mounted for WebRTC
   if (roomState === 'waiting') {
     return (
       <div className="multiplayer-playfield multiplayer-playfield--waiting">
-        {/* Hidden video element to capture stream for WebRTC during waiting */}
-        <video
-          ref={handleVideoRef}
-          className="video-feed video-feed--hidden"
-          autoPlay
-          playsInline
-          muted
-        />
+        {/* Video previews during waiting */}
+        <div className="waiting-video-preview">
+          <div className="video-preview-container">
+            <video
+              ref={handleVideoRef}
+              className="video-preview-feed"
+              autoPlay
+              playsInline
+              muted
+            />
+            <div className="video-preview-label">You</div>
+          </div>
+          <div className="video-preview-container">
+            <video
+              ref={remoteVideoRef}
+              className="video-preview-feed"
+              autoPlay
+              playsInline
+              muted
+            />
+            <div className="video-preview-label">{opponent?.name || 'Opponent'}</div>
+            {!remoteStream && (
+              <div className="video-preview-overlay">
+                {opponent ? 'Connecting...' : 'Waiting for opponent...'}
+              </div>
+            )}
+          </div>
+        </div>
         {/* Waiting room overlay */}
-        <WaitingRoom onBack={handleExit} />
+        <WaitingRoom onBack={handleExit} isVideoConnected={connectionState === 'connected'} />
         {/* WebRTC connection status */}
         <div className="webrtc-status">
           <span className={`webrtc-status-dot webrtc-status-dot--${

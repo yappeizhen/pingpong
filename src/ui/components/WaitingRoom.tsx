@@ -4,9 +4,10 @@ import './WaitingRoom.css'
 
 interface WaitingRoomProps {
   onBack: () => void
+  isVideoConnected?: boolean
 }
 
-export function WaitingRoom({ onBack }: WaitingRoomProps) {
+export function WaitingRoom({ onBack, isVideoConnected = false }: WaitingRoomProps) {
   const {
     roomCode,
     roomState,
@@ -41,15 +42,17 @@ export function WaitingRoom({ onBack }: WaitingRoomProps) {
     }
   }, [roomState])
 
+  const canStart = isHost && hasBothPlayers && isVideoConnected
+
   const handleStartGame = useCallback(async () => {
-    if (isHost && hasBothPlayers) {
+    if (canStart) {
       await updateRoomState('countdown')
       
       setTimeout(async () => {
         await updateRoomState('playing')
       }, 3000)
     }
-  }, [isHost, hasBothPlayers, updateRoomState])
+  }, [canStart, updateRoomState])
 
   const handleLeave = useCallback(async () => {
     await leaveRoom()
@@ -162,14 +165,20 @@ export function WaitingRoom({ onBack }: WaitingRoomProps) {
             <button
               className="action-btn primary"
               onClick={handleStartGame}
-              disabled={!hasBothPlayers}
+              disabled={!canStart}
             >
-              {hasBothPlayers ? 'Start Game' : 'Waiting for opponent...'}
+              {!hasBothPlayers 
+                ? 'Waiting for opponent...' 
+                : !isVideoConnected
+                  ? 'Connecting video...'
+                  : 'Start Game'}
             </button>
           )}
 
           {!isHost && opponent && (
-            <p className="waiting-message">Waiting for host to start...</p>
+            <p className="waiting-message">
+              {isVideoConnected ? 'Waiting for host to start...' : 'Connecting video...'}
+            </p>
           )}
         </div>
 
