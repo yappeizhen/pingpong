@@ -27,6 +27,47 @@ const getFilesetResolver = async (): Promise<WasmFilesetType> => {
   return filesetResolverPromise
 }
 
+// Global singleton for HandLandmarker to prevent duplicate WASM/WebGL contexts
+let globalLandmarker: HandLandmarker | null = null
+let landmarkerPromise: Promise<HandLandmarker> | null = null
+let landmarkerMaxHands = 2
+
+const getGlobalLandmarker = async (maxHands: number): Promise<HandLandmarker> => {
+  // If landmarker exists with same or more hands, reuse it
+  if (globalLandmarker && landmarkerMaxHands >= maxHands) {
+    return globalLandmarker
+  }
+  
+  // If landmarker is being created, wait for it
+  if (landmarkerPromise && landmarkerMaxHands >= maxHands) {
+    return landmarkerPromise
+  }
+  
+  // Close existing landmarker if we need more hands
+  if (globalLandmarker) {
+    globalLandmarker.close()
+    globalLandmarker = null
+  }
+  
+  landmarkerMaxHands = maxHands
+  landmarkerPromise = (async () => {
+    const filesetResolver = await getFilesetResolver()
+    const landmarker = await HandLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: { modelAssetPath: MODEL_URL },
+      runningMode: 'VIDEO',
+      numHands: maxHands,
+    })
+    globalLandmarker = landmarker
+    return landmarker
+  })()
+  
+  landmarkerPromise.catch(() => {
+    landmarkerPromise = null
+  })
+  
+  return landmarkerPromise
+}
+
 export type HandFrameListener = (frame: HandFrame | null) => void
 export type StatusListener = (status: HandTrackingStatus) => void
 
@@ -109,12 +150,31 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
       return
     }
 
+    // Don't process if video isn't ready, paused, or has zero dimensions
+    // readyState >= 3 means HAVE_FUTURE_DATA - enough data to play
+    if (
+      videoEl.readyState < 3 ||
+      videoEl.paused ||
+      videoEl.videoWidth === 0 ||
+      videoEl.videoHeight === 0
+    ) {
+      rafId = requestAnimationFrame(detectionLoop)
+      return
+    }
+
     const hasNewFrame = videoEl.currentTime !== lastVideoTime
     lastVideoTime = videoEl.currentTime
 
     if (hasNewFrame) {
       const now = performance.now()
-      const result = landmarker.detectForVideo(videoEl, now)
+      let result
+      try {
+        result = landmarker.detectForVideo(videoEl, now)
+      } catch {
+        // Skip frame if detection fails (e.g., WebGL errors)
+        rafId = requestAnimationFrame(detectionLoop)
+        return
+      }
       const frameDelta = now - lastFrameTimestamp
       const fps = Number.isFinite(frameDelta) && frameDelta > 0 ? 1000 / frameDelta : 0
       lastFrameTimestamp = now
@@ -127,12 +187,8 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
 
   const ensureLandmarker = async () => {
     if (landmarker) return landmarker
-    const filesetResolver = await getFilesetResolver()
-    landmarker = await HandLandmarker.createFromOptions(filesetResolver, {
-      baseOptions: { modelAssetPath: MODEL_URL },
-      runningMode: 'VIDEO',
-      numHands: maxHands,
-    })
+    // Use global singleton to prevent duplicate WASM/WebGL contexts
+    landmarker = await getGlobalLandmarker(maxHands)
     return landmarker
   }
 
@@ -222,7 +278,8 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
   const stop = () => {
     stopLoop()
     cleanupStream()
-    landmarker?.close()
+    // Don't close the global landmarker - just clear our reference
+    // The global singleton will be reused by other tracker instances
     landmarker = undefined
     notifyStatus('idle')
     emitFrame(null)

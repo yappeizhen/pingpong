@@ -2,15 +2,10 @@ import { useRef, useEffect, useCallback, useState } from 'react'
 import { PongGame } from '@/game'
 import { useHandData } from '@/cv'
 import { useHandController, type HandControllerState } from '@/hooks'
-import { useMultiplayerRoom, getPlayerId } from '@/multiplayer'
-import {
-  createPeerConnection,
-  closePeerConnection,
-  getLocalMediaStream,
-  stopMediaStream,
-} from '@/multiplayer/webrtcService'
+import { useMultiplayerRoom, getPlayerId, useWebRTC } from '@/multiplayer'
+import { stopMediaStream } from '@/multiplayer/webrtcService'
 import { gameSyncService } from '@/multiplayer/gameSyncService'
-import type { GameSyncMessage, WebRTCConnection } from '@/multiplayer/types'
+import type { GameSyncMessage } from '@/multiplayer/types'
 import { HandOverlay } from './HandOverlay'
 import { GameHUD } from './GameHUD'
 import { useGameStore } from '@/state'
@@ -30,7 +25,6 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const gameRef = useRef<PongGame | null>(null)
-  const connectionRef = useRef<WebRTCConnection | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
 
   const { startTracking } = useHandData()
@@ -57,10 +51,114 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     resetGame,
   } = useGameStore()
 
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null)
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null)
   const [isConnecting, setIsConnecting] = useState(true)
-  const [connectionStatus, setConnectionStatus] = useState<string>('Connecting...')
+  const [connectionStatus, setConnectionStatus] = useState<string>('Getting camera access...')
   const [showCountdown, setShowCountdown] = useState(false)
   const playerId = getPlayerId()
+
+  // Handle data channel from WebRTC
+  const handleDataChannel = useCallback((channel: RTCDataChannel) => {
+    console.log('[MultiplayerPlayfield] Data channel ready')
+    setDataChannel(channel)
+    gameSyncService.setDataChannel(channel, isHost)
+    setIsConnecting(false)
+    setConnectionStatus('Connected!')
+    setShowCountdown(true)
+  }, [setDataChannel, isHost])
+
+  // WebRTC hook - enable when we have a local stream
+  const { remoteStream, connectionState } = useWebRTC({
+    roomId,
+    isHost,
+    localStream,
+    enabled: !!localStream && !!roomId,
+    onDataChannel: handleDataChannel,
+  })
+
+  // Attach remote stream to video element
+  useEffect(() => {
+    if (!remoteVideoRef.current || !remoteStream) return
+    
+    remoteVideoRef.current.srcObject = remoteStream
+    remoteVideoRef.current.play().catch(() => {})
+    setRemoteStream(remoteStream)
+  }, [remoteStream, setRemoteStream])
+
+  // Update connection status based on WebRTC state
+  useEffect(() => {
+    if (connectionState === 'connecting') {
+      setConnectionStatus('Connecting to opponent...')
+    } else if (connectionState === 'connected') {
+      setConnectionStatus('Connected!')
+    } else if (connectionState === 'failed') {
+      setConnectionError('Connection failed')
+    }
+  }, [connectionState, setConnectionError])
+
+  // Poll video element for stream - like frootninja does
+  useEffect(() => {
+    if (localStream) return // Already have stream
+    if (!videoElement) return // No video element yet
+
+    let attempts = 0
+    const maxAttempts = 50 // 15 seconds max wait
+
+    const checkStream = () => {
+      if (videoElement.srcObject instanceof MediaStream) {
+        console.log('[MultiplayerPlayfield] Captured local stream from video element')
+        setLocalStream(videoElement.srcObject)
+        localStreamRef.current = videoElement.srcObject
+        return true
+      }
+      return false
+    }
+
+    // Check immediately
+    if (checkStream()) return
+
+    // Poll for stream
+    const timer = window.setInterval(() => {
+      if (checkStream()) {
+        clearInterval(timer)
+      } else if (++attempts >= maxAttempts) {
+        console.warn('[MultiplayerPlayfield] Failed to capture local stream after', maxAttempts, 'attempts')
+        clearInterval(timer)
+        setConnectionError('Failed to access camera')
+      }
+    }, 300)
+
+    return () => clearInterval(timer)
+  }, [localStream, videoElement, setConnectionError])
+
+  // Handle video ref callback - start tracking when video element mounts
+  const handleVideoRef = useCallback(
+    (node: HTMLVideoElement | null) => {
+      localVideoRef.current = node
+      
+      if (node) {
+        setVideoElement(node)
+        
+        // Listen for play event to capture stream
+        node.addEventListener('play', () => {
+          if (node.srcObject instanceof MediaStream) {
+            console.log('[MultiplayerPlayfield] Captured stream on play event')
+            setLocalStream(node.srcObject)
+            localStreamRef.current = node.srcObject
+          }
+        })
+        
+        // Start hand tracking - this will set up the camera
+        startTracking(node).catch(err => {
+          console.error('[MultiplayerPlayfield] Failed to start tracking:', err)
+        })
+      } else {
+        setVideoElement(null)
+      }
+    },
+    [startTracking]
+  )
 
   const handlePaddleUpdate = useCallback(
     (state: HandControllerState) => {
@@ -91,6 +189,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     onStateChange: handlePaddleUpdate,
   })
 
+  // Initialize game
   useEffect(() => {
     if (!canvasRef.current) return
 
@@ -118,79 +217,18 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     }
   }, [scorePoint, isHost])
 
+  // Cleanup on unmount
   useEffect(() => {
-    const setupWebRTC = async () => {
-      if (!roomId || connectionRef.current) return
-
-      setConnectionStatus('Getting camera access...')
-      const localStream = await getLocalMediaStream()
-      if (!localStream) {
-        setConnectionError('Failed to access camera')
-        setIsConnecting(false)
-        return
-      }
-
-      localStreamRef.current = localStream
-
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = localStream
-        await localVideoRef.current.play().catch(() => {})
-      }
-
-      try {
-        if (localVideoRef.current) {
-          await startTracking(localVideoRef.current)
-        }
-      } catch {
-        // MediaPipe may throw on reload - continue anyway
-      }
-
-      setConnectionStatus('Connecting to opponent...')
-
-      const connection = await createPeerConnection(
-        roomId,
-        playerId,
-        isHost,
-        localStream,
-        (remoteStream) => {
-          setRemoteStream(remoteStream)
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = remoteStream
-            remoteVideoRef.current.play().catch(() => {})
-          }
-        },
-        (dataChannel) => {
-          setDataChannel(dataChannel)
-          gameSyncService.setDataChannel(dataChannel, isHost)
-          setIsConnecting(false)
-          setConnectionStatus('Connected!')
-          setShowCountdown(true)
-        }
-      )
-
-      if (connection) {
-        connectionRef.current = connection
-      } else {
-        setConnectionError('Failed to establish connection')
-        setIsConnecting(false)
-      }
-    }
-
-    setupWebRTC()
-
     return () => {
-      if (connectionRef.current && roomId) {
-        closePeerConnection(connectionRef.current, roomId, playerId)
-        connectionRef.current = null
-      }
       if (localStreamRef.current) {
         stopMediaStream(localStreamRef.current)
         localStreamRef.current = null
       }
       gameSyncService.close()
     }
-  }, [roomId, isHost, playerId])
+  }, [])
 
+  // Handle game sync messages
   useEffect(() => {
     const unsubscribe = gameSyncService.onMessage((message: GameSyncMessage) => {
       switch (message.type) {
@@ -336,7 +374,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
         <div className="video-container local-video">
           <video
-            ref={localVideoRef}
+            ref={handleVideoRef}
             className="video-feed"
             playsInline
             muted
