@@ -3,7 +3,6 @@ import { PongGame } from '@/game'
 import { useHandData } from '@/cv'
 import { useHandController, type HandControllerState } from '@/hooks'
 import { useMultiplayerRoom, getPlayerId, useWebRTC } from '@/multiplayer'
-import { stopMediaStream } from '@/multiplayer/webrtcService'
 import { gameSyncService } from '@/multiplayer/gameSyncService'
 import type { GameSyncMessage } from '@/multiplayer/types'
 import { HandOverlay } from './HandOverlay'
@@ -240,16 +239,14 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     }
   }, [scorePoint, isHost])
 
-  // Cleanup on unmount
+  // Cleanup on unmount - DON'T stop the stream, it's owned by HandTrackerProvider
   useEffect(() => {
     console.log('[MultiplayerPlayfield] Cleanup effect mounted')
     return () => {
-      console.log('[MultiplayerPlayfield] Cleanup effect running - stopping stream and closing gameSyncService')
-      if (localStreamRef.current) {
-        console.log('[MultiplayerPlayfield] Stopping local stream')
-        stopMediaStream(localStreamRef.current)
-        localStreamRef.current = null
-      }
+      console.log('[MultiplayerPlayfield] Cleanup effect running')
+      // Don't stop the stream - it's managed by HandTrackerProvider
+      // Just clear our reference
+      localStreamRef.current = null
       gameSyncService.close()
     }
   }, [])
