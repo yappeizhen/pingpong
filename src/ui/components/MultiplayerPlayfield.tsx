@@ -22,12 +22,13 @@ interface MultiplayerPlayfieldProps {
 
 export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const gameRef = useRef<PongGame | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
 
-  const { startTracking } = useHandData()
+  // Get videoRef callback from hand tracker (like frootninja)
+  const { videoRef, status: handTrackerStatus } = useHandData()
+  
   const {
     roomId,
     roomState,
@@ -97,13 +98,26 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     }
   }, [connectionState, setConnectionError])
 
-  // Poll video element for stream - like frootninja does
+  // Update connection status based on hand tracker status
   useEffect(() => {
-    if (localStream) return // Already have stream
-    if (!videoElement) return // No video element yet
+    if (handTrackerStatus === 'initializing') {
+      setConnectionStatus('Initializing camera...')
+    } else if (handTrackerStatus === 'ready' && !localStream) {
+      setConnectionStatus('Camera ready, waiting for stream...')
+    } else if (handTrackerStatus === 'permission-denied') {
+      setConnectionError('Camera permission denied')
+    } else if (handTrackerStatus === 'error') {
+      setConnectionError('Camera error')
+    }
+  }, [handTrackerStatus, localStream, setConnectionError])
+
+  // Poll video element for stream (like frootninja)
+  useEffect(() => {
+    if (localStream) return
+    if (!videoElement) return
 
     let attempts = 0
-    const maxAttempts = 50 // 15 seconds max wait
+    const maxAttempts = 50
 
     const checkStream = () => {
       if (videoElement.srcObject instanceof MediaStream) {
@@ -115,28 +129,23 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
       return false
     }
 
-    // Check immediately
     if (checkStream()) return
 
-    // Poll for stream
     const timer = window.setInterval(() => {
       if (checkStream()) {
         clearInterval(timer)
       } else if (++attempts >= maxAttempts) {
-        console.warn('[MultiplayerPlayfield] Failed to capture local stream after', maxAttempts, 'attempts')
+        console.warn('[MultiplayerPlayfield] Failed to capture local stream')
         clearInterval(timer)
-        setConnectionError('Failed to access camera')
       }
     }, 300)
 
     return () => clearInterval(timer)
-  }, [localStream, videoElement, setConnectionError])
+  }, [localStream, videoElement])
 
-  // Handle video ref callback - start tracking when video element mounts
+  // Combined video ref handler (like frootninja's handleVideoRef)
   const handleVideoRef = useCallback(
     (node: HTMLVideoElement | null) => {
-      localVideoRef.current = node
-      
       if (node) {
         setVideoElement(node)
         
@@ -148,16 +157,13 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
             localStreamRef.current = node.srcObject
           }
         })
-        
-        // Start hand tracking - this will set up the camera
-        startTracking(node).catch(err => {
-          console.error('[MultiplayerPlayfield] Failed to start tracking:', err)
-        })
       } else {
         setVideoElement(null)
       }
+      // Call the hand tracker's videoRef to start tracking
+      videoRef(node)
     },
-    [startTracking]
+    [videoRef]
   )
 
   const handlePaddleUpdate = useCallback(

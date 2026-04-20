@@ -18,12 +18,11 @@ import './Playfield.css'
 
 export function Playfield() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
   const gameRef = useRef<PongGame | null>(null)
   const aiRef = useRef<AIController | null>(null)
   const lastAiUpdateRef = useRef<number>(0)
 
-  const { status, startTracking, stopTracking } = useHandData()
+  const { status, videoRef } = useHandData()
 
   const {
     phase,
@@ -79,16 +78,7 @@ export function Playfield() {
     }
   }, [scorePoint])
 
-  useEffect(() => {
-    if (phase === 'waiting-for-camera' && status === 'idle') {
-      if (videoRef.current) {
-        startTracking(videoRef.current).catch((err) => {
-          console.error('[Playfield] Failed to start tracking:', err)
-        })
-      }
-    }
-  }, [phase, status, startTracking])
-
+  // Transition from waiting-for-camera to ready when tracking is ready
   useEffect(() => {
     if (phase === 'waiting-for-camera' && status === 'ready') {
       setPhase('ready')
@@ -144,12 +134,6 @@ export function Playfield() {
 
     return () => cancelAnimationFrame(animationId)
   }, [phase])
-
-  useEffect(() => {
-    return () => {
-      stopTracking()
-    }
-  }, [stopTracking])
 
   const scorerName = lastScorer === 'player1' ? player1.name : player2.name
 

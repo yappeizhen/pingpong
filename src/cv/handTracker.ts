@@ -6,68 +6,6 @@ const MODEL_URL =
 const TASKS_VISION_VERSION = '0.10.22-rc.20250304'
 const WASM_FILES_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VISION_VERSION}/wasm`
 
-type WasmFilesetType = Awaited<ReturnType<typeof FilesetResolver.forVisionTasks>>
-let globalFilesetResolver: WasmFilesetType | null = null
-let filesetResolverPromise: Promise<WasmFilesetType> | null = null
-
-const getFilesetResolver = async (): Promise<WasmFilesetType> => {
-  if (globalFilesetResolver) return globalFilesetResolver
-  if (filesetResolverPromise) return filesetResolverPromise
-  
-  filesetResolverPromise = FilesetResolver.forVisionTasks(WASM_FILES_URL)
-    .then(resolver => {
-      globalFilesetResolver = resolver
-      return resolver
-    })
-    .catch(error => {
-      filesetResolverPromise = null
-      throw error
-    })
-  
-  return filesetResolverPromise
-}
-
-// Global singleton for HandLandmarker to prevent duplicate WASM/WebGL contexts
-let globalLandmarker: HandLandmarker | null = null
-let landmarkerPromise: Promise<HandLandmarker> | null = null
-let landmarkerMaxHands = 2
-
-const getGlobalLandmarker = async (maxHands: number): Promise<HandLandmarker> => {
-  // If landmarker exists with same or more hands, reuse it
-  if (globalLandmarker && landmarkerMaxHands >= maxHands) {
-    return globalLandmarker
-  }
-  
-  // If landmarker is being created, wait for it
-  if (landmarkerPromise && landmarkerMaxHands >= maxHands) {
-    return landmarkerPromise
-  }
-  
-  // Close existing landmarker if we need more hands
-  if (globalLandmarker) {
-    globalLandmarker.close()
-    globalLandmarker = null
-  }
-  
-  landmarkerMaxHands = maxHands
-  landmarkerPromise = (async () => {
-    const filesetResolver = await getFilesetResolver()
-    const landmarker = await HandLandmarker.createFromOptions(filesetResolver, {
-      baseOptions: { modelAssetPath: MODEL_URL },
-      runningMode: 'VIDEO',
-      numHands: maxHands,
-    })
-    globalLandmarker = landmarker
-    return landmarker
-  })()
-  
-  landmarkerPromise.catch(() => {
-    landmarkerPromise = null
-  })
-  
-  return landmarkerPromise
-}
-
 export type HandFrameListener = (frame: HandFrame | null) => void
 export type StatusListener = (status: HandTrackingStatus) => void
 
@@ -150,10 +88,9 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
       return
     }
 
-    // Don't process if video isn't ready, paused, or has zero dimensions
-    // readyState >= 3 means HAVE_FUTURE_DATA - enough data to play
+    // Skip if video isn't ready
     if (
-      videoEl.readyState < 3 ||
+      videoEl.readyState < 2 ||
       videoEl.paused ||
       videoEl.videoWidth === 0 ||
       videoEl.videoHeight === 0
@@ -167,19 +104,16 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
 
     if (hasNewFrame) {
       const now = performance.now()
-      let result
       try {
-        result = landmarker.detectForVideo(videoEl, now)
+        const result = landmarker.detectForVideo(videoEl, now)
+        const frameDelta = now - lastFrameTimestamp
+        const fps = Number.isFinite(frameDelta) && frameDelta > 0 ? 1000 / frameDelta : 0
+        lastFrameTimestamp = now
+        const frame = convertResultToFrame(result, now, fps)
+        emitFrame(frame)
       } catch {
-        // Skip frame if detection fails (e.g., WebGL errors)
-        rafId = requestAnimationFrame(detectionLoop)
-        return
+        // Skip frame on detection error
       }
-      const frameDelta = now - lastFrameTimestamp
-      const fps = Number.isFinite(frameDelta) && frameDelta > 0 ? 1000 / frameDelta : 0
-      lastFrameTimestamp = now
-      const frame = convertResultToFrame(result, now, fps)
-      emitFrame(frame)
     }
 
     rafId = requestAnimationFrame(detectionLoop)
@@ -187,8 +121,12 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
 
   const ensureLandmarker = async () => {
     if (landmarker) return landmarker
-    // Use global singleton to prevent duplicate WASM/WebGL contexts
-    landmarker = await getGlobalLandmarker(maxHands)
+    const filesetResolver = await FilesetResolver.forVisionTasks(WASM_FILES_URL)
+    landmarker = await HandLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: { modelAssetPath: MODEL_URL },
+      runningMode: 'VIDEO',
+      numHands: maxHands,
+    })
     return landmarker
   }
 
@@ -264,6 +202,7 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
         notifyStatus('permission-denied')
       } else {
+        console.error('[handTracker] Init failed:', error)
         notifyStatus('error')
       }
       cleanupStream()
@@ -278,8 +217,7 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
   const stop = () => {
     stopLoop()
     cleanupStream()
-    // Don't close the global landmarker - just clear our reference
-    // The global singleton will be reused by other tracker instances
+    landmarker?.close()
     landmarker = undefined
     notifyStatus('idle')
     emitFrame(null)
