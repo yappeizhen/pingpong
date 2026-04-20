@@ -13,6 +13,7 @@ import {
   PointScoredOverlay,
   GameOverOverlay,
 } from './GameOverlays'
+import { WaitingRoom } from './WaitingRoom'
 import './MultiplayerPlayfield.css'
 
 interface MultiplayerPlayfieldProps {
@@ -348,6 +349,45 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const isYourWin =
     (player1.score > player2.score && isHost) ||
     (player2.score > player1.score && !isHost)
+
+  // Show waiting room with hidden video element to initialize camera/WebRTC early
+  if (roomState === 'waiting') {
+    return (
+      <div className="multiplayer-playfield multiplayer-playfield--waiting">
+        {/* Hidden video element to capture stream for WebRTC during waiting */}
+        <video
+          ref={handleVideoRef}
+          className="video-feed video-feed--hidden"
+          autoPlay
+          playsInline
+          muted
+        />
+        {/* Waiting room overlay */}
+        <WaitingRoom onBack={handleExit} />
+        {/* WebRTC connection status */}
+        <div className="webrtc-status">
+          <span className={`webrtc-status-dot webrtc-status-dot--${
+            handTrackerStatus === 'permission-denied' ? 'failed' 
+            : !localStream ? 'initializing' 
+            : connectionState
+          }`} />
+          {handTrackerStatus === 'initializing'
+            ? 'Loading camera...'
+            : handTrackerStatus === 'permission-denied'
+              ? 'Camera access denied'
+              : !localStream 
+                ? 'Starting camera...'
+                : connectionState === 'connected' 
+                  ? 'Video connected' 
+                  : connectionState === 'connecting' 
+                    ? 'Connecting video...'
+                    : opponent 
+                      ? 'Waiting for opponent video...'
+                      : 'Camera ready'}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="multiplayer-playfield">

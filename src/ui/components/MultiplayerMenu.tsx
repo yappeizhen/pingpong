@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useMultiplayerRoom } from '@/multiplayer'
 import { getPlayerName, setPlayerName } from '@/multiplayer/multiplayerService'
-import { WaitingRoom } from './WaitingRoom'
 import { MultiplayerPlayfield } from './MultiplayerPlayfield'
 import './MultiplayerMenu.css'
 
@@ -14,7 +13,6 @@ type MenuView = 'menu' | 'create' | 'join' | 'waiting'
 export function MultiplayerMenu({ onBack }: MultiplayerMenuProps) {
   const {
     roomCode,
-    roomState,
     createRoom,
     joinRoom,
     leaveRoom,
@@ -86,12 +84,9 @@ export function MultiplayerMenu({ onBack }: MultiplayerMenuProps) {
     }
   }, [view, onBack])
 
-  if (roomState === 'countdown' || roomState === 'playing' || roomState === 'finished') {
-    return <MultiplayerPlayfield onExit={handleLeave} />
-  }
-
+  // Once we have a room, stay in MultiplayerPlayfield (which handles waiting room as overlay)
   if (roomCode || view === 'waiting') {
-    return <WaitingRoom onBack={handleLeave} />
+    return <MultiplayerPlayfield onExit={handleLeave} />
   }
 
   if (view === 'create') {
