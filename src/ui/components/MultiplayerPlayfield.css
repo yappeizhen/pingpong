@@ -18,19 +18,6 @@
 }
 
 /* ============================================
-   WAITING STATE
-   ============================================ */
-.multiplayer-playfield--waiting .game-area {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.multiplayer-playfield--waiting .game-area .game-canvas {
-  display: none;
-}
-
-/* ============================================
    BACKGROUND VIDEO (your camera)
    ============================================ */
 .background-video {
@@ -39,7 +26,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 1;
+  z-index: 0;
   pointer-events: none;
 }
 
@@ -48,7 +35,7 @@
   height: 100%;
   object-fit: cover;
   transform: scaleX(-1);
-  opacity: 0.2;
+  opacity: 0.25;
   filter: blur(4px) saturate(0.6);
 }
 
@@ -56,6 +43,39 @@
 .background-video--waiting video {
   opacity: 0.4;
   filter: blur(2px) saturate(0.8);
+}
+
+/* ============================================
+   GAME AREA & CANVAS
+   ============================================ */
+.game-area {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.multiplayer-playfield .game-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Hide canvas during waiting */
+.multiplayer-playfield--waiting .game-canvas {
+  display: none;
+}
+
+/* Center waiting room content */
+.multiplayer-playfield--waiting .game-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ============================================
@@ -115,40 +135,6 @@
 }
 
 /* ============================================
-   VIDEO OVERLAY SHARED STYLES
-   ============================================ */
-.video-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.875rem;
-}
-
-/* ============================================
-   GAME AREA
-   ============================================ */
-.game-area {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.multiplayer-playfield .game-canvas {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: block;
-  z-index: 2;
-}
-
-/* ============================================
    EXIT BUTTON
    ============================================ */
 .exit-btn {
@@ -192,26 +178,6 @@
    MOBILE RESPONSIVE
    ============================================ */
 @media (max-width: 900px) {
-  .multiplayer-playfield {
-    min-height: 100vh;
-  }
-
-  .multiplayer-playfield--waiting .game-area {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* Make waiting room fill the game area properly on mobile */
-  .waiting-room {
-    position: relative;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-  }
-
   .floating-opponent-video {
     width: 120px;
     height: 90px;

@@ -295,9 +295,26 @@ export class PongGame {
     this.isGuestMode = isGuest
   }
 
-  setRemoteBallState(state: BallState) {
-    this.remoteBallState = state
-    this.physics.setState(state)
+  setRemoteBallState(state: BallState, flipPerspective: boolean = false) {
+    if (flipPerspective) {
+      // Transform ball state for guest's perspective (opposite side of table)
+      this.remoteBallState = {
+        ...state,
+        position: {
+          x: -state.position.x,
+          y: state.position.y,
+          z: -state.position.z,
+        },
+        velocity: {
+          x: -state.velocity.x,
+          y: state.velocity.y,
+          z: -state.velocity.z,
+        },
+      }
+    } else {
+      this.remoteBallState = state
+    }
+    this.physics.setState(this.remoteBallState)
   }
 
   start() {
