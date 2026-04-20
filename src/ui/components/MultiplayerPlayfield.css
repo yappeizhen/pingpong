@@ -1,9 +1,10 @@
 .multiplayer-playfield {
   width: 100%;
-  flex: 1;
+  height: 100%;
   display: flex;
   background: #0a0a12;
   position: relative;
+  overflow: hidden;
 }
 
 /* ============================================

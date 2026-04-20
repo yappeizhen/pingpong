@@ -4,34 +4,31 @@
   box-sizing: border-box;
 }
 
-html {
+html, body {
   width: 100%;
   height: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  width: 100%;
-  min-height: 100%;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: #0f0f1a;
   color: white;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 #root {
   width: 100%;
-  min-height: 100vh;
+  height: 100%;
   display: flex;
-  flex-direction: column;
 }
 
 .app {
   width: 100%;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+  height: 100%;
 }
 
 button {

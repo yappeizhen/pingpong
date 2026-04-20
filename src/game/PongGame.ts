@@ -349,7 +349,18 @@ export class PongGame {
     let ballState: BallState
 
     if (this.isGuestMode && this.remoteBallState) {
-      ballState = this.remoteBallState
+      // Guest mode: use host's ball state but also check local collision
+      // This allows responsive paddle hits despite network latency
+      this.physics.setState(this.remoteBallState)
+      
+      // Run collision detection for guest's paddle (player2) locally
+      const result = this.physics.update(delta, this.player1Paddle, this.player2Paddle)
+      
+      if (result.point && this.onPoint) {
+        this.onPoint(result.point.winner, result.point.reason)
+      }
+      
+      ballState = this.physics.getState()
     } else {
       const result = this.physics.update(delta, this.player1Paddle, this.player2Paddle)
 

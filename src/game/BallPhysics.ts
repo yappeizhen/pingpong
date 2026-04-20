@@ -184,17 +184,17 @@ export class BallPhysics {
     const dz = this.state.position.z - paddleZ
 
     const distanceXY = Math.sqrt(dx * dx + dy * dy)
-    // AI has slightly larger hit zone when positioned well
-    const hitZone = player === 'player2' ? PADDLE.HIT_ZONE * 1.15 : PADDLE.HIT_ZONE
-    // AI has more depth tolerance since it can position itself
-    const depthTolerance = player === 'player2' ? 0.25 : 0.2
+    // Both players get same hit zone in multiplayer
+    const hitZone = PADDLE.HIT_ZONE * 1.2
+    // Increased depth tolerance for network latency
+    const depthTolerance = 0.3
 
     const approachingPaddle =
       (player === 'player1' && this.state.velocity.z > 0) ||
       (player === 'player2' && this.state.velocity.z < 0)
 
-    // For player, require swinging motion; AI is always ready
-    const canHit = player === 'player2' || paddle.isSwinging
+    // Both players can hit when paddle is active (swinging or recently active)
+    const canHit = paddle.isActive || paddle.isSwinging
 
     if (distanceXY < hitZone && Math.abs(dz) < depthTolerance && approachingPaddle && canHit) {
       const direction = player === 'player1' ? -1 : 1
