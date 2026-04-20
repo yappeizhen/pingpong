@@ -293,6 +293,24 @@ export class PongGame {
 
   setGuestMode(isGuest: boolean) {
     this.isGuestMode = isGuest
+    
+    if (isGuest) {
+      // Flip camera to view from opponent's side of the table
+      this.camera.position.set(
+        -CAMERA.POSITION.x,
+        CAMERA.POSITION.y,
+        -CAMERA.POSITION.z
+      )
+      this.camera.lookAt(
+        -CAMERA.LOOK_AT.x,
+        CAMERA.LOOK_AT.y,
+        -CAMERA.LOOK_AT.z
+      )
+    } else {
+      // Reset to default camera position
+      this.camera.position.set(CAMERA.POSITION.x, CAMERA.POSITION.y, CAMERA.POSITION.z)
+      this.camera.lookAt(CAMERA.LOOK_AT.x, CAMERA.LOOK_AT.y, CAMERA.LOOK_AT.z)
+    }
   }
 
   setRemoteBallState(state: BallState) {
