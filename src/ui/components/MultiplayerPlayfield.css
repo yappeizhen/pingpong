@@ -7,68 +7,44 @@
 }
 
 .multiplayer-playfield--waiting {
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  padding-top: 2rem;
+  /* Keep flex layout but add padding for waiting room overlay */
 }
 
-.waiting-video-preview {
-  display: flex;
+.multiplayer-playfield--waiting .game-area--hidden {
+  display: none;
+}
+
+/* Video sidebar styling during waiting - show as preview at top */
+.video-sidebar--waiting {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  flex-direction: row;
   gap: 1rem;
-  margin-bottom: 1rem;
+  padding: 0;
+  background: transparent;
+  border: none;
   z-index: 10;
 }
 
-.video-preview-container {
+.video-sidebar--waiting .video-container {
   width: 160px;
   height: 120px;
-  border-radius: 0.75rem;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.5);
+  aspect-ratio: auto;
   border: 2px solid rgba(255, 255, 255, 0.2);
-  position: relative;
 }
 
-.video-preview-feed {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1);
+.video-sidebar--waiting .opponent-video {
+  flex: none;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
-.video-preview-label {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 0.25rem 0.5rem;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-  color: white;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-align: center;
-}
-
-.video-preview-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.75rem;
-  text-align: center;
-  padding: 0.5rem;
-}
-
-.video-feed--hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
+.video-sidebar--waiting .local-video {
+  flex: none;
+  height: 120px;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .webrtc-status {

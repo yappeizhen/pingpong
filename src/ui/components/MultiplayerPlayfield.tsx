@@ -54,8 +54,6 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null)
-  const [isConnecting, setIsConnecting] = useState(true)
-  const [connectionStatus, setConnectionStatus] = useState<string>('Getting camera access...')
   const [showCountdown, setShowCountdown] = useState(false)
   const playerId = getPlayerId()
 
@@ -64,9 +62,6 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     console.log('[MultiplayerPlayfield] Data channel ready')
     setDataChannel(channel)
     gameSyncService.setDataChannel(channel, isHost)
-    setIsConnecting(false)
-    setConnectionStatus('Connected!')
-    setShowCountdown(true)
   }, [setDataChannel, isHost])
 
   // WebRTC hook - enable when we have a local stream
@@ -87,29 +82,17 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     setRemoteStream(remoteStream)
   }, [remoteStream, setRemoteStream])
 
-  // Update connection status based on WebRTC state
+  // Handle connection errors
   useEffect(() => {
-    if (connectionState === 'connecting') {
-      setConnectionStatus('Connecting to opponent...')
-    } else if (connectionState === 'connected') {
-      setConnectionStatus('Connected!')
-    } else if (connectionState === 'failed') {
+    if (connectionState === 'failed') {
       setConnectionError('Connection failed')
     }
-  }, [connectionState, setConnectionError])
-
-  // Update connection status based on hand tracker status
-  useEffect(() => {
-    if (handTrackerStatus === 'initializing') {
-      setConnectionStatus('Initializing camera...')
-    } else if (handTrackerStatus === 'ready' && !localStream) {
-      setConnectionStatus('Camera ready, waiting for stream...')
-    } else if (handTrackerStatus === 'permission-denied') {
+    if (handTrackerStatus === 'permission-denied') {
       setConnectionError('Camera permission denied')
     } else if (handTrackerStatus === 'error') {
       setConnectionError('Camera error')
     }
-  }, [handTrackerStatus, localStream, setConnectionError])
+  }, [connectionState, handTrackerStatus, setConnectionError])
 
   // Poll video element for stream (like frootninja)
   useEffect(() => {
@@ -305,7 +288,6 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     if (roomState === 'countdown') {
       console.log('[MultiplayerPlayfield] Room state changed to countdown, showing countdown overlay')
       setShowCountdown(true)
-      setIsConnecting(false)
     }
   }, [roomState])
 
@@ -362,67 +344,12 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     (player2.score > player1.score && !isHost)
 
   // Show waiting room with video preview - keep both video elements mounted for WebRTC
-  if (roomState === 'waiting') {
-    return (
-      <div className="multiplayer-playfield multiplayer-playfield--waiting">
-        {/* Video previews during waiting */}
-        <div className="waiting-video-preview">
-          <div className="video-preview-container">
-            <video
-              ref={handleVideoRef}
-              className="video-preview-feed"
-              autoPlay
-              playsInline
-              muted
-            />
-            <div className="video-preview-label">You</div>
-          </div>
-          <div className="video-preview-container">
-            <video
-              ref={remoteVideoRef}
-              className="video-preview-feed"
-              autoPlay
-              playsInline
-              muted
-            />
-            <div className="video-preview-label">{opponent?.name || 'Opponent'}</div>
-            {!remoteStream && (
-              <div className="video-preview-overlay">
-                {opponent ? 'Connecting...' : 'Waiting for opponent...'}
-              </div>
-            )}
-          </div>
-        </div>
-        {/* Waiting room overlay */}
-        <WaitingRoom onBack={handleExit} isVideoConnected={connectionState === 'connected'} />
-        {/* WebRTC connection status */}
-        <div className="webrtc-status">
-          <span className={`webrtc-status-dot webrtc-status-dot--${
-            handTrackerStatus === 'permission-denied' ? 'failed' 
-            : !localStream ? 'initializing' 
-            : connectionState
-          }`} />
-          {handTrackerStatus === 'initializing'
-            ? 'Loading camera...'
-            : handTrackerStatus === 'permission-denied'
-              ? 'Camera access denied'
-              : !localStream 
-                ? 'Starting camera...'
-                : connectionState === 'connected' 
-                  ? 'Video connected' 
-                  : connectionState === 'connecting' 
-                    ? 'Connecting video...'
-                    : opponent 
-                      ? 'Waiting for opponent video...'
-                      : 'Camera ready'}
-        </div>
-      </div>
-    )
-  }
+  const isWaiting = roomState === 'waiting'
 
   return (
-    <div className="multiplayer-playfield">
-      <div className="game-area">
+    <div className={`multiplayer-playfield ${isWaiting ? 'multiplayer-playfield--waiting' : ''}`}>
+      {/* Game area - hidden during waiting */}
+      <div className={`game-area ${isWaiting ? 'game-area--hidden' : ''}`}>
         <canvas ref={canvasRef} className="game-canvas" />
         <HandOverlay paddleSize={0.035} paddleColor="#ffdd00" showDebug={false} />
         <GameHUD />
@@ -447,7 +374,8 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         )}
       </div>
 
-      <div className="video-sidebar">
+      {/* Video sidebar - always mounted, styled differently during waiting */}
+      <div className={`video-sidebar ${isWaiting ? 'video-sidebar--waiting' : ''}`}>
         <div className="video-container opponent-video">
           <video
             ref={remoteVideoRef}
@@ -459,9 +387,9 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
           <div className="video-label">
             {opponent?.name || 'Opponent'}
           </div>
-          {isConnecting && (
+          {!remoteStream && (
             <div className="video-overlay">
-              <span>{connectionStatus}</span>
+              <span>{opponent ? 'Connecting...' : 'Waiting for opponent...'}</span>
             </div>
           )}
         </div>
@@ -477,6 +405,33 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
           <div className="video-label">You</div>
         </div>
       </div>
+
+      {/* Waiting room overlay */}
+      {isWaiting && (
+        <>
+          <WaitingRoom onBack={handleExit} isVideoConnected={connectionState === 'connected'} />
+          <div className="webrtc-status">
+            <span className={`webrtc-status-dot webrtc-status-dot--${
+              handTrackerStatus === 'permission-denied' ? 'failed' 
+              : !localStream ? 'initializing' 
+              : connectionState
+            }`} />
+            {handTrackerStatus === 'initializing'
+              ? 'Loading camera...'
+              : handTrackerStatus === 'permission-denied'
+                ? 'Camera access denied'
+                : !localStream 
+                  ? 'Starting camera...'
+                  : connectionState === 'connected' 
+                    ? 'Video connected' 
+                    : connectionState === 'connecting' 
+                      ? 'Connecting video...'
+                      : opponent 
+                        ? 'Waiting for opponent video...'
+                        : 'Camera ready'}
+          </div>
+        </>
+      )}
 
       <button className="exit-btn" onClick={handleExit} title="Leave game">
         ✕
