@@ -48,6 +48,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     lastScorer,
     seed,
     setPhase,
+    setServingPlayer,
     scorePoint,
     resetGame,
   } = useGameStore()
@@ -289,6 +290,8 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         case 'serve':
           if (gameRef.current) {
             gameRef.current.serve(message.player, message.seed)
+            // Sync serving player state
+            setServingPlayer(message.player)
           }
           break
 
@@ -299,6 +302,10 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
           break
 
         case 'game-start':
+          // Sync serving player from host
+          if (message.servingPlayer) {
+            setServingPlayer(message.servingPlayer)
+          }
           setPhase('serving')
           break
 
@@ -309,7 +316,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     })
 
     return unsubscribe
-  }, [isHost, playerId, scorePoint, setPhase])
+  }, [isHost, playerId, scorePoint, setPhase, setServingPlayer])
 
   // Show countdown when room state changes to countdown
   useEffect(() => {
