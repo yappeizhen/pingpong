@@ -82,8 +82,21 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
     return { hands, timestamp, fps }
   }
 
+  let loopCount = 0
+  let lastLogTime = 0
+  
   const detectionLoop = () => {
+    loopCount++
+    const now = performance.now()
+    
+    // Log every 5 seconds
+    if (now - lastLogTime > 5000) {
+      console.log('[handTracker] Detection loop running, count:', loopCount, 'videoEl:', !!videoEl, 'landmarker:', !!landmarker)
+      lastLogTime = now
+    }
+    
     if (!videoEl || !landmarker) {
+      console.warn('[handTracker] Detection loop stopped: videoEl=', !!videoEl, 'landmarker=', !!landmarker)
       emitFrame(null)
       return
     }
@@ -160,19 +173,30 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
   let isStarting = false
 
   const start = async (video: HTMLVideoElement) => {
-    if (isStarting) return
-    if (status === 'ready' && videoEl === video) return
+    console.log('[handTracker] start() called, isStarting:', isStarting, 'status:', status, 'sameVideo:', videoEl === video)
+    
+    if (isStarting) {
+      console.log('[handTracker] Already starting, returning')
+      return
+    }
+    if (status === 'ready' && videoEl === video) {
+      console.log('[handTracker] Already ready with same video, returning')
+      return
+    }
 
     if (status === 'ready' && videoEl !== video) {
+      console.log('[handTracker] Switching to new video element while already ready')
       isStarting = true
       try {
         // Check if video already has a working stream
         const existingStream = video.srcObject as MediaStream | null
         if (existingStream && existingStream.active) {
+          console.log('[handTracker] Using existing stream from new video')
           videoEl = video
           mediaStream = existingStream
           lastVideoTime = -1
         } else if (mediaStream && mediaStream.active) {
+          console.log('[handTracker] Reusing our stream on new video')
           video.srcObject = mediaStream
           video.playsInline = true
           video.muted = true
@@ -180,6 +204,7 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
           videoEl = video
           lastVideoTime = -1
         } else {
+          console.log('[handTracker] Getting new camera for new video')
           await attachCamera(video)
           lastVideoTime = -1
         }
@@ -189,14 +214,18 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
       return
     }
 
+    console.log('[handTracker] Initial start, getting camera and landmarker')
     isStarting = true
     notifyStatus('initializing')
     try {
       await attachCamera(video)
+      console.log('[handTracker] Camera attached, stream:', !!mediaStream)
       await ensureLandmarker()
+      console.log('[handTracker] Landmarker ready')
       notifyStatus('ready')
       lastVideoTime = -1
       stopLoop()
+      console.log('[handTracker] Starting detection loop')
       rafId = requestAnimationFrame(detectionLoop)
     } catch (error) {
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
@@ -215,6 +244,8 @@ export const createHandTracker = (options: TrackerOptions = {}): HandTracker => 
   }
 
   const stop = () => {
+    console.log('[handTracker] stop() called')
+    console.trace('[handTracker] stop() call stack')
     stopLoop()
     cleanupStream()
     landmarker?.close()

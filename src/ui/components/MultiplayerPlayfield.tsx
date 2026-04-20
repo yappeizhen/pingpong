@@ -113,17 +113,27 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
   // Poll video element for stream (like frootninja)
   useEffect(() => {
-    if (localStream) return
-    if (!videoElement) return
+    console.log('[MultiplayerPlayfield] Stream polling effect - localStream:', !!localStream, 'videoElement:', !!videoElement)
+    
+    if (localStream) {
+      console.log('[MultiplayerPlayfield] Already have localStream, skipping poll')
+      return
+    }
+    if (!videoElement) {
+      console.log('[MultiplayerPlayfield] No videoElement yet, skipping poll')
+      return
+    }
 
     let attempts = 0
     const maxAttempts = 50
 
     const checkStream = () => {
-      if (videoElement.srcObject instanceof MediaStream) {
-        console.log('[MultiplayerPlayfield] Captured local stream from video element')
-        setLocalStream(videoElement.srcObject)
-        localStreamRef.current = videoElement.srcObject
+      const srcObject = videoElement.srcObject
+      console.log('[MultiplayerPlayfield] Checking stream, attempt:', attempts, 'srcObject:', !!srcObject, 'isMediaStream:', srcObject instanceof MediaStream)
+      if (srcObject instanceof MediaStream) {
+        console.log('[MultiplayerPlayfield] Captured local stream from video element, tracks:', srcObject.getTracks().length)
+        setLocalStream(srcObject)
+        localStreamRef.current = srcObject
         return true
       }
       return false
@@ -135,32 +145,39 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
       if (checkStream()) {
         clearInterval(timer)
       } else if (++attempts >= maxAttempts) {
-        console.warn('[MultiplayerPlayfield] Failed to capture local stream')
+        console.warn('[MultiplayerPlayfield] Failed to capture local stream after', maxAttempts, 'attempts')
         clearInterval(timer)
       }
     }, 300)
 
-    return () => clearInterval(timer)
+    return () => {
+      console.log('[MultiplayerPlayfield] Stream polling cleanup')
+      clearInterval(timer)
+    }
   }, [localStream, videoElement])
 
   // Combined video ref handler (like frootninja's handleVideoRef)
   const handleVideoRef = useCallback(
     (node: HTMLVideoElement | null) => {
+      console.log('[MultiplayerPlayfield] handleVideoRef called with node:', !!node)
       if (node) {
         setVideoElement(node)
         
         // Listen for play event to capture stream
         node.addEventListener('play', () => {
+          console.log('[MultiplayerPlayfield] Video play event fired, srcObject:', !!node.srcObject)
           if (node.srcObject instanceof MediaStream) {
-            console.log('[MultiplayerPlayfield] Captured stream on play event')
+            console.log('[MultiplayerPlayfield] Captured stream on play event, tracks:', (node.srcObject as MediaStream).getTracks().length)
             setLocalStream(node.srcObject)
             localStreamRef.current = node.srcObject
           }
         })
       } else {
+        console.log('[MultiplayerPlayfield] handleVideoRef called with null - unmounting?')
         setVideoElement(null)
       }
       // Call the hand tracker's videoRef to start tracking
+      console.log('[MultiplayerPlayfield] Calling hand tracker videoRef')
       videoRef(node)
     },
     [videoRef]
@@ -225,8 +242,11 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
   // Cleanup on unmount
   useEffect(() => {
+    console.log('[MultiplayerPlayfield] Cleanup effect mounted')
     return () => {
+      console.log('[MultiplayerPlayfield] Cleanup effect running - stopping stream and closing gameSyncService')
       if (localStreamRef.current) {
+        console.log('[MultiplayerPlayfield] Stopping local stream')
         stopMediaStream(localStreamRef.current)
         localStreamRef.current = null
       }

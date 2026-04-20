@@ -43,15 +43,21 @@ export function useWebRTC({ roomId, isHost, localStream, enabled, onDataChannel 
   }, [roomId, isHost])
 
   useEffect(() => {
+    console.log('[useWebRTC] Effect triggered - enabled:', enabled, 'roomId:', !!roomId, 'localStream:', !!localStream, 'reconnectTrigger:', reconnectTrigger)
+    
     if (!enabled || !roomId || !localStream) {
+      console.log('[useWebRTC] Not ready, returning early')
       return
     }
 
     if (connectionRef.current) {
       const state = connectionRef.current.peerConnection.connectionState
+      console.log('[useWebRTC] Existing connection state:', state)
       if (state === 'connected' || state === 'connecting') {
+        console.log('[useWebRTC] Connection healthy, skipping setup')
         return
       }
+      console.log('[useWebRTC] Closing unhealthy connection')
       closePeerConnection(connectionRef.current, roomId, isHost ? 'host' : 'guest')
       connectionRef.current = null
     }
@@ -109,8 +115,10 @@ export function useWebRTC({ roomId, isHost, localStream, enabled, onDataChannel 
     setupConnection()
 
     return () => {
+      console.log('[useWebRTC] Cleanup triggered, mounted was:', mounted)
       mounted = false
       if (connectionRef.current) {
+        console.log('[useWebRTC] Closing connection in cleanup')
         closePeerConnection(connectionRef.current, roomId, isHost ? 'host' : 'guest')
         connectionRef.current = null
         setRemoteStream(null)

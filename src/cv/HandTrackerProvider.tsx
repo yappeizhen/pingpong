@@ -27,10 +27,13 @@ export function HandTrackerProvider({
 
   const start = useCallback(async () => {
     const video = videoElementRef.current
+    console.log('[HandTrackerProvider] start() called, video element:', !!video)
     if (!video) return
     const tracker = ensureTracker()
     try {
+      console.log('[HandTrackerProvider] Calling tracker.start()...')
       await tracker.start(video)
+      console.log('[HandTrackerProvider] tracker.start() succeeded')
       setError(null)
     } catch (err) {
       console.error('[HandTrackerProvider] tracker.start() failed:', err)
@@ -49,8 +52,10 @@ export function HandTrackerProvider({
 
   const videoRef = useCallback(
     (node: HTMLVideoElement | null) => {
+      console.log('[HandTrackerProvider] videoRef called with node:', !!node)
       videoElementRef.current = node
       if (node) {
+        console.log('[HandTrackerProvider] Video element assigned, starting tracker...')
         void start()
       }
     },
@@ -58,11 +63,13 @@ export function HandTrackerProvider({
   )
 
   useEffect(() => {
+    console.log('[HandTrackerProvider] Setting up tracker subscriptions')
     const tracker = ensureTracker()
     const unsubscribeFrame = tracker.subscribe((nextFrame) => {
       setFrame(nextFrame)
     })
     const unsubscribeStatus = tracker.onStatusChange((nextStatus) => {
+      console.log('[HandTrackerProvider] Status changed to:', nextStatus)
       setStatus(nextStatus)
       if (nextStatus === 'permission-denied') {
         setError('Camera permission denied')
@@ -70,6 +77,7 @@ export function HandTrackerProvider({
     })
     setStatus(tracker.getStatus())
     return () => {
+      console.log('[HandTrackerProvider] Cleanup - stopping tracker')
       unsubscribeFrame()
       unsubscribeStatus()
       tracker.stop()
