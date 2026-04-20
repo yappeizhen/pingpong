@@ -35,8 +35,8 @@ export class PongGame {
   private isGuestMode = false
   private remoteBallState: BallState | null = null
   private remoteBallFrames: RemoteBallFrame[] = []
-  private readonly remoteInterpolationDelayMs = 100
-  private readonly remoteMaxExtrapolationMs = 60
+  private readonly remoteInterpolationDelayMs = 50
+  private readonly remoteMaxExtrapolationMs = 90
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas

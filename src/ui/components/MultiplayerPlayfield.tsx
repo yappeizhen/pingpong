@@ -20,6 +20,11 @@ interface MultiplayerPlayfieldProps {
   onExit: () => void
 }
 
+const REMOTE_PADDLE_BASE_COMP_MS = 70
+const REMOTE_PADDLE_MIN_COMP_MS = 16
+const REMOTE_PADDLE_MAX_COMP_MS = 140
+const REMOTE_PADDLE_MAX_LEAD = 0.18
+
 export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -70,6 +75,45 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     lastBallSeqRef.current = 0
     gameRef.current?.clearRemoteSync()
   }, [])
+
+  const clamp01 = useCallback((value: number) => {
+    return Math.min(1, Math.max(0, value))
+  }, [])
+
+  const compensateRemotePaddleLatency = useCallback(
+    (
+      paddle: {
+        position: { x: number; y: number }
+        velocity: { x: number; y: number }
+        isActive: boolean
+        isSwinging: boolean
+        swipeSpeed: number
+        hand: HandControllerState['hand']
+      },
+      messageTimestamp: number
+    ) => {
+      const apparentAgeMs = Date.now() - messageTimestamp
+      const compensationMs = Math.min(
+        REMOTE_PADDLE_MAX_COMP_MS,
+        Math.max(
+          REMOTE_PADDLE_MIN_COMP_MS,
+          Number.isFinite(apparentAgeMs) ? apparentAgeMs : REMOTE_PADDLE_BASE_COMP_MS
+        )
+      )
+      const dt = compensationMs / 1000
+      const leadX = Math.max(-REMOTE_PADDLE_MAX_LEAD, Math.min(REMOTE_PADDLE_MAX_LEAD, paddle.velocity.x * dt))
+      const leadY = Math.max(-REMOTE_PADDLE_MAX_LEAD, Math.min(REMOTE_PADDLE_MAX_LEAD, paddle.velocity.y * dt))
+
+      return {
+        ...paddle,
+        position: {
+          x: clamp01(paddle.position.x + leadX),
+          y: clamp01(paddle.position.y + leadY),
+        },
+      }
+    },
+    [clamp01]
+  )
 
   // Handle data channel from WebRTC
   const handleDataChannel = useCallback((channel: RTCDataChannel) => {
@@ -290,7 +334,10 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
               hand: message.paddle.hand,
             }
             if (isHost) {
-              gameRef.current.setPlayer2Paddle(paddleData)
+              // Host-side latency compensation for guest paddle improves collision fairness.
+              gameRef.current.setPlayer2Paddle(
+                compensateRemotePaddleLatency(paddleData, message.timestamp)
+              )
             } else {
               gameRef.current.setPlayer1Paddle(paddleData)
             }
@@ -366,7 +413,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     })
 
     return unsubscribe
-  }, [isHost, playerId, scorePoint, setPhase, setServingPlayer, resetGuestBallSync])
+  }, [isHost, playerId, scorePoint, setPhase, setServingPlayer, resetGuestBallSync, compensateRemotePaddleLatency])
 
   // Show countdown when room state changes to countdown
   useEffect(() => {
