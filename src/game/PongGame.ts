@@ -262,8 +262,11 @@ export class PongGame {
   }
 
   private updatePaddleMesh(mesh: THREE.Mesh, paddle: PaddleState, player: Player) {
-    // Only show opponent's paddle (player2) - player1 uses the 2D overlay instead
-    mesh.visible = player === 'player2'
+    // Show opponent's paddle mesh (local player uses the 2D overlay instead)
+    // Host: show player2 (opponent = guest)
+    // Guest: show player1 (opponent = host)
+    const isOpponent = this.isGuestMode ? player === 'player1' : player === 'player2'
+    mesh.visible = isOpponent
 
     const x = (paddle.position.x - 0.5) * TABLE.WIDTH
     const y = TABLE.HEIGHT + 0.1 + paddle.position.y * 0.4
