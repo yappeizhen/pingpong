@@ -20,7 +20,28 @@ export function useWebRTC({ roomId, isHost, localStream, enabled, onDataChannel 
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState | 'idle'>('idle')
   const [reconnectTrigger, setReconnectTrigger] = useState(0)
   const connectionRef = useRef<WebRTCConnection | null>(null)
+  
+  // Store current values in refs for unmount cleanup and stable callbacks
+  const roomIdRef = useRef(roomId)
+  const isHostRef = useRef(isHost)
+  const onDataChannelRef = useRef(onDataChannel)
+  roomIdRef.current = roomId
+  isHostRef.current = isHost
+  onDataChannelRef.current = onDataChannel
 
+  // Track component unmount - this runs ONLY on unmount
+  useEffect(() => {
+    return () => {
+      // Clean up connection on true unmount
+      if (connectionRef.current && roomIdRef.current) {
+        console.log('[useWebRTC] Component unmounting, closing connection')
+        closePeerConnection(connectionRef.current, roomIdRef.current, isHostRef.current ? 'host' : 'guest')
+        connectionRef.current = null
+      }
+    }
+  }, []) // Empty deps = only runs on mount/unmount
+
+  // Stable callbacks using refs - never change identity
   const handleRemoteStream = useCallback((stream: MediaStream) => {
     console.log('[useWebRTC] Remote stream received')
     setRemoteStream(stream)
@@ -28,8 +49,8 @@ export function useWebRTC({ roomId, isHost, localStream, enabled, onDataChannel 
 
   const handleDataChannel = useCallback((channel: RTCDataChannel) => {
     console.log('[useWebRTC] Data channel ready')
-    onDataChannel?.(channel)
-  }, [onDataChannel])
+    onDataChannelRef.current?.(channel)
+  }, []) // Empty deps - uses ref for latest callback
 
   const reconnect = useCallback(() => {
     if (connectionRef.current && roomId) {
@@ -115,15 +136,10 @@ export function useWebRTC({ roomId, isHost, localStream, enabled, onDataChannel 
     setupConnection()
 
     return () => {
-      console.log('[useWebRTC] Cleanup triggered, mounted was:', mounted)
+      console.log('[useWebRTC] Effect cleanup triggered, mounted was:', mounted)
       mounted = false
-      if (connectionRef.current) {
-        console.log('[useWebRTC] Closing connection in cleanup')
-        closePeerConnection(connectionRef.current, roomId, isHost ? 'host' : 'guest')
-        connectionRef.current = null
-        setRemoteStream(null)
-        setConnectionState('idle')
-      }
+      // Don't close connection here - let the unmount effect handle true unmounts
+      // This cleanup runs on every dependency change, we don't want to break healthy connections
     }
   }, [enabled, roomId, isHost, localStream, handleRemoteStream, handleDataChannel, reconnectTrigger, reconnect])
 

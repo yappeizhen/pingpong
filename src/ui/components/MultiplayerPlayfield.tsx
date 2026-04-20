@@ -299,6 +299,31 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     }
   }, [roomState, phase, setPhase])
 
+  // Ensure videos keep playing after state transitions
+  useEffect(() => {
+    if (roomState === 'countdown' || roomState === 'playing') {
+      // Re-attach streams and ensure videos are playing
+      const localVideo = videoElement
+      const remoteVideo = remoteVideoRef.current
+
+      if (localVideo && localStreamRef.current) {
+        if (localVideo.srcObject !== localStreamRef.current) {
+          console.log('[MultiplayerPlayfield] Re-attaching local stream after state change')
+          localVideo.srcObject = localStreamRef.current
+        }
+        localVideo.play().catch(() => {})
+      }
+
+      if (remoteVideo && remoteStream) {
+        if (remoteVideo.srcObject !== remoteStream) {
+          console.log('[MultiplayerPlayfield] Re-attaching remote stream after state change')
+          remoteVideo.srcObject = remoteStream
+        }
+        remoteVideo.play().catch(() => {})
+      }
+    }
+  }, [roomState, videoElement, remoteStream])
+
   const doServe = useCallback(() => {
     if (!gameRef.current) return
 
