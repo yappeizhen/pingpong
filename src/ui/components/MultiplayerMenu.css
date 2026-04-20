@@ -218,6 +218,7 @@
 
 @media (max-width: 600px) {
   .multiplayer-menu {
+    min-height: 100vh;
     justify-content: flex-start;
     padding-top: 3rem;
     padding-bottom: 2rem;

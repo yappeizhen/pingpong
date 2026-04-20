@@ -5,19 +5,29 @@
 }
 
 html,
-body {
-  width: 100%;
-  min-height: 100%;
-}
-
+body,
 #root {
   width: 100%;
-  min-height: 100%;
+  height: 100%;
 }
 
 body {
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+/* Allow scrolling on mobile when content overflows */
+@media (max-width: 600px) {
+  html,
+  body,
+  #root {
+    height: auto;
+    min-height: 100%;
+  }
+  
+  body {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
 }
 
 body {
@@ -30,9 +40,16 @@ body {
 
 .app {
   width: 100%;
-  min-height: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+@media (max-width: 600px) {
+  .app {
+    height: auto;
+    min-height: 100%;
+  }
 }
 
 button {
