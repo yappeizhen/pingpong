@@ -1,27 +1,46 @@
 import { useGameStore } from '@/state'
 import './GameHUD.css'
 
-export function GameHUD() {
+interface GameHUDProps {
+  isMultiplayer?: boolean
+  isHost?: boolean
+  hideMenuButton?: boolean
+}
+
+export function GameHUD({ isMultiplayer = false, isHost = true, hideMenuButton = false }: GameHUDProps) {
   const { player1, player2, servingPlayer, rallyCount, phase, resetGame } = useGameStore()
+
+  // In multiplayer, determine if it's "your turn" based on whether you're the serving player
+  // Host is player1, Guest is player2
+  const myPlayer = isMultiplayer ? (isHost ? 'player1' : 'player2') : 'player1'
+  const isMyServe = servingPlayer === myPlayer
+
+  // Determine display names and scores based on perspective
+  const youName = isMultiplayer ? (isHost ? player1.name : player2.name) : player1.name
+  const youScore = isMultiplayer ? (isHost ? player1.score : player2.score) : player1.score
+  const opponentName = isMultiplayer ? (isHost ? player2.name : player1.name) : player2.name
+  const opponentScore = isMultiplayer ? (isHost ? player2.score : player1.score) : player2.score
 
   return (
     <div className="game-hud">
-      <button className="hud-menu-btn" onClick={resetGame} title="Return to menu">
-        ✕
-      </button>
+      {!hideMenuButton && (
+        <button className="hud-menu-btn" onClick={resetGame} title="Return to menu">
+          ✕
+        </button>
+      )}
       <div className="hud-scores">
-        <div className={`hud-player ${servingPlayer === 'player1' ? 'serving' : ''}`}>
-          <span className="player-name">{player1.name}</span>
-          <span className="player-score">{player1.score}</span>
-          {servingPlayer === 'player1' && <span className="serve-indicator">●</span>}
+        <div className={`hud-player ${isMyServe ? 'serving' : ''}`}>
+          <span className="player-name">{youName || 'You'}</span>
+          <span className="player-score">{youScore}</span>
+          {isMyServe && <span className="serve-indicator">●</span>}
         </div>
 
         <div className="hud-divider">-</div>
 
-        <div className={`hud-player opponent ${servingPlayer === 'player2' ? 'serving' : ''}`}>
-          <span className="player-name">{player2.name}</span>
-          <span className="player-score">{player2.score}</span>
-          {servingPlayer === 'player2' && <span className="serve-indicator">●</span>}
+        <div className={`hud-player opponent ${!isMyServe && servingPlayer ? 'serving' : ''}`}>
+          <span className="player-name">{opponentName || 'Opponent'}</span>
+          <span className="player-score">{opponentScore}</span>
+          {!isMyServe && servingPlayer && <span className="serve-indicator">●</span>}
         </div>
       </div>
 
@@ -31,7 +50,7 @@ export function GameHUD() {
 
       {phase === 'serving' && (
         <div className="hud-message">
-          {servingPlayer === 'player1' ? 'Your serve - Open palm to serve!' : 'Opponent serving...'}
+          {isMyServe ? 'Your serve - Swipe to serve!' : 'Opponent serving...'}
         </div>
       )}
     </div>

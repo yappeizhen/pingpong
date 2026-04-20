@@ -179,7 +179,12 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         hand: state.hand,
       }
 
-      gameRef.current.setPlayer1Paddle(paddleState)
+      // Host is player1, Guest is player2
+      if (isHost) {
+        gameRef.current.setPlayer1Paddle(paddleState)
+      } else {
+        gameRef.current.setPlayer2Paddle(paddleState)
+      }
       gameSyncService.sendPaddle(playerId, paddleState)
 
       if (isHost && phase === 'playing') {
@@ -217,7 +222,23 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
     game.start()
 
+    // Host sends ball state at regular intervals (not just on paddle movement)
+    let ballSyncInterval: ReturnType<typeof setInterval> | null = null
+    if (isHost) {
+      ballSyncInterval = setInterval(() => {
+        if (gameRef.current && gameSyncService.isConnected()) {
+          const ballState = gameRef.current.getBallState()
+          if (ballState.isInPlay) {
+            gameSyncService.sendBall(ballState)
+          }
+        }
+      }, 50) // 20 times per second
+    }
+
     return () => {
+      if (ballSyncInterval) {
+        clearInterval(ballSyncInterval)
+      }
       game.dispose()
       gameRef.current = null
     }
@@ -241,14 +262,21 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
       switch (message.type) {
         case 'paddle':
           if (message.playerId !== playerId && gameRef.current) {
-            gameRef.current.setPlayer2Paddle({
+            // Host receives guest's paddle → set player2 (far side)
+            // Guest receives host's paddle → set player1 (near side)
+            const paddleData = {
               position: message.paddle.position,
               velocity: message.paddle.velocity,
               isActive: message.paddle.isActive,
               isSwinging: message.paddle.isSwinging,
               swipeSpeed: message.paddle.swipeSpeed,
               hand: message.paddle.hand,
-            })
+            }
+            if (isHost) {
+              gameRef.current.setPlayer2Paddle(paddleData)
+            } else {
+              gameRef.current.setPlayer1Paddle(paddleData)
+            }
           }
           break
 
@@ -373,11 +401,21 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
   return (
     <div className={`multiplayer-playfield ${isWaiting ? 'multiplayer-playfield--waiting' : ''}`}>
-      {/* Game area - hidden during waiting */}
-      <div className={`game-area ${isWaiting ? 'game-area--hidden' : ''}`}>
+      {/* Game area - shows WaitingRoom content during waiting, game during play */}
+      <div className="game-area">
         <canvas ref={canvasRef} className="game-canvas" />
-        <HandOverlay paddleSize={0.035} paddleColor="#ffdd00" showDebug={false} />
-        <GameHUD />
+        
+        {!isWaiting && (
+          <>
+            <HandOverlay paddleSize={0.035} paddleColor="#ffdd00" showDebug={false} />
+            <GameHUD isMultiplayer={true} isHost={isHost} hideMenuButton={true} />
+          </>
+        )}
+
+        {/* Waiting room content - rendered inside game area */}
+        {isWaiting && (
+          <WaitingRoom onBack={handleExit} isVideoConnected={connectionState === 'connected'} />
+        )}
 
         {showCountdown && (
           <CountdownOverlay onComplete={handleCountdownComplete} />
@@ -399,8 +437,8 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         )}
       </div>
 
-      {/* Video sidebar - always mounted, styled differently during waiting */}
-      <div className={`video-sidebar ${isWaiting ? 'video-sidebar--waiting' : ''}`}>
+      {/* Video sidebar - same layout for waiting and playing */}
+      <div className="video-sidebar">
         <div className="video-container opponent-video">
           <video
             ref={remoteVideoRef}
@@ -414,7 +452,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
           </div>
           {!remoteStream && (
             <div className="video-overlay">
-              <span>{opponent ? 'Connecting...' : 'Waiting for opponent...'}</span>
+              <span>{opponent ? 'Connecting...' : 'Waiting...'}</span>
             </div>
           )}
         </div>
@@ -429,34 +467,33 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
           />
           <div className="video-label">You</div>
         </div>
-      </div>
 
-      {/* Waiting room overlay */}
-      {isWaiting && (
-        <>
-          <WaitingRoom onBack={handleExit} isVideoConnected={connectionState === 'connected'} />
-          <div className="webrtc-status">
-            <span className={`webrtc-status-dot webrtc-status-dot--${
+        {/* Connection status in sidebar */}
+        {isWaiting && (
+          <div className="sidebar-status">
+            <span className={`status-dot status-dot--${
               handTrackerStatus === 'permission-denied' ? 'failed' 
               : !localStream ? 'initializing' 
               : connectionState
             }`} />
-            {handTrackerStatus === 'initializing'
-              ? 'Loading camera...'
-              : handTrackerStatus === 'permission-denied'
-                ? 'Camera access denied'
-                : !localStream 
-                  ? 'Starting camera...'
-                  : connectionState === 'connected' 
-                    ? 'Video connected' 
-                    : connectionState === 'connecting' 
-                      ? 'Connecting video...'
-                      : opponent 
-                        ? 'Waiting for opponent video...'
-                        : 'Camera ready'}
+            <span className="status-text">
+              {handTrackerStatus === 'initializing'
+                ? 'Loading camera...'
+                : handTrackerStatus === 'permission-denied'
+                  ? 'Camera denied'
+                  : !localStream 
+                    ? 'Starting camera...'
+                    : connectionState === 'connected' 
+                      ? 'Connected' 
+                      : connectionState === 'connecting' 
+                        ? 'Connecting...'
+                        : opponent 
+                          ? 'Waiting for video...'
+                          : 'Ready'}
+            </span>
           </div>
-        </>
-      )}
+        )}
+      </div>
 
       <button className="exit-btn" onClick={handleExit} title="Leave game">
         ✕

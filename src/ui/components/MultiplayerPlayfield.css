@@ -6,89 +6,62 @@
   position: relative;
 }
 
-.multiplayer-playfield--waiting {
-  /* Keep flex layout but add padding for waiting room overlay */
+/* During waiting, game area shows a placeholder background */
+.multiplayer-playfield--waiting .game-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0a0a12 0%, #1a1a2e 100%);
 }
 
-.multiplayer-playfield--waiting .game-area--hidden {
+.multiplayer-playfield--waiting .game-area .game-canvas {
   display: none;
 }
 
-/* Video sidebar styling during waiting - show as preview at top */
-.video-sidebar--waiting {
-  position: absolute;
-  top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: auto;
-  flex-direction: row;
-  gap: 1rem;
-  padding: 0;
-  background: transparent;
-  border: none;
-  z-index: 10;
-}
+/* Video sidebar stays in same position for waiting and playing */
 
-.video-sidebar--waiting .video-container {
-  width: 160px;
-  height: 120px;
-  aspect-ratio: auto;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-}
-
-.video-sidebar--waiting .opponent-video {
-  flex: none;
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.video-sidebar--waiting .local-video {
-  flex: none;
-  height: 120px;
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.webrtc-status {
-  position: fixed;
-  bottom: 1.5rem;
-  left: 50%;
-  transform: translateX(-50%);
+/* Sidebar status indicator */
+.sidebar-status {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: rgba(15, 15, 26, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 2rem;
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.8125rem;
-  font-family: 'Inter', sans-serif;
-  z-index: 100;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 0.5rem;
+  margin-top: auto;
 }
 
-.webrtc-status-dot {
+.status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: #888;
+  flex-shrink: 0;
 }
 
-.webrtc-status-dot--idle,
-.webrtc-status-dot--initializing {
+.status-dot--idle,
+.status-dot--initializing {
   background: #ffc107;
   animation: pulse 1.5s ease-in-out infinite;
 }
 
-.webrtc-status-dot--connecting {
+.status-dot--connecting {
   background: #2196f3;
   animation: pulse 1s ease-in-out infinite;
 }
 
-.webrtc-status-dot--connected {
+.status-dot--connected {
   background: #4caf50;
 }
 
-.webrtc-status-dot--failed {
+.status-dot--failed {
   background: #f44336;
+}
+
+.status-text {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8125rem;
+  font-family: 'Inter', sans-serif;
 }
 
 @keyframes pulse {
