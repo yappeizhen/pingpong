@@ -27,6 +27,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const localStreamRef = useRef<MediaStream | null>(null)
   const phaseRef = useRef<string>('idle')
   const servingPlayerRef = useRef<'player1' | 'player2'>('player1')
+  const scoreRef = useRef({ player1: 0, player2: 0 })
 
   // Get videoRef callback from hand tracker (like frootninja)
   const { videoRef, status: handTrackerStatus } = useHandData()
@@ -57,6 +58,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   // Keep refs in sync for use in callbacks
   phaseRef.current = phase
   servingPlayerRef.current = servingPlayer
+  scoreRef.current = { player1: player1.score, player2: player2.score }
 
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null)
@@ -215,13 +217,24 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
     game.setGuestMode(!isHost)
 
+    // Both players detect points locally for responsive feedback
+    // Host sends authoritative score sync, guest reconciles when message arrives
     game.setOnPoint((winner, reason) => {
+      // Only increment score locally if we haven't already processed this point
+      const currentPhase = phaseRef.current
+      if (currentPhase === 'point-scored') {
+        // Already processing a point, ignore duplicate detection
+        return
+      }
+
       scorePoint(winner)
 
+      // Only host sends the authoritative point message
       if (isHost) {
+        const currentScore = scoreRef.current
         gameSyncService.sendPoint(winner, reason, {
-          player1: winner === 'player1' ? player1.score + 1 : player1.score,
-          player2: winner === 'player2' ? player2.score + 1 : player2.score,
+          player1: winner === 'player1' ? currentScore.player1 + 1 : currentScore.player1,
+          player2: winner === 'player2' ? currentScore.player2 + 1 : currentScore.player2,
         })
       }
     })
@@ -317,8 +330,16 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
           break
 
         case 'point':
-          if (!isHost) {
-            scorePoint(message.winner)
+          if (!isHost && message.score) {
+            // Guest reconciles with host's authoritative score
+            // This corrects any desync from local detection
+            const currentState = useGameStore.getState()
+            if (currentState.player1.score !== message.score.player1 ||
+                currentState.player2.score !== message.score.player2) {
+              console.log('[MultiplayerPlayfield] Reconciling score with host:', message.score)
+              const { setScore } = useGameStore.getState()
+              setScore(message.score.player1, message.score.player2, message.winner)
+            }
           }
           break
 

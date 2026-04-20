@@ -9,6 +9,7 @@ interface GameStore extends GameState {
   setPlayer1Paddle: (paddle: Partial<PaddleState>) => void
   setPlayer2Paddle: (paddle: Partial<PaddleState>) => void
   scorePoint: (winner: Player) => void
+  setScore: (player1Score: number, player2Score: number, lastScorer: Player) => void
   setServingPlayer: (player: Player) => void
   incrementRally: () => void
   resetRally: () => void
@@ -111,6 +112,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
       player2: { ...state.player2, score: newScore2, isServing: newServer === 'player2' },
       servingPlayer: newServer,
       lastScorer: winner,
+      rallyCount: 0,
+      phase: gameOver ? 'game-over' : 'point-scored',
+    })
+  },
+
+  setScore: (player1Score, player2Score, lastScorer) => {
+    const state = get()
+    const totalPoints = player1Score + player2Score
+    const serveSwitch = totalPoints % GAME.SERVE_SWITCH_INTERVAL === 0
+    const newServer = serveSwitch
+      ? state.servingPlayer === 'player1'
+        ? 'player2'
+        : 'player1'
+      : state.servingPlayer
+
+    const gameOver = player1Score >= GAME.POINTS_TO_WIN || player2Score >= GAME.POINTS_TO_WIN
+
+    set({
+      player1: { ...state.player1, score: player1Score, isServing: newServer === 'player1' },
+      player2: { ...state.player2, score: player2Score, isServing: newServer === 'player2' },
+      servingPlayer: newServer,
+      lastScorer,
       rallyCount: 0,
       phase: gameOver ? 'game-over' : 'point-scored',
     })
