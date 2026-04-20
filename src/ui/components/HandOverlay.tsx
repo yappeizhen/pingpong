@@ -104,8 +104,8 @@ export function HandOverlay({
     if (palm.isOpen) {
       ctx.save()
       
-      // Glow stronger when swinging - yellow theme
-      ctx.shadowColor = swipe.isSwinging ? '#ffee00' : paddleColor
+      // Keep glow tied to player paddle color (host yellow, guest red).
+      ctx.shadowColor = paddleColor
       ctx.shadowBlur = swipe.isSwinging ? 30 : 15
       
       // Paddle grows slightly when swinging
@@ -114,8 +114,8 @@ export function HandOverlay({
       
       ctx.beginPath()
       ctx.arc(palmX, palmY, currentRadius, 0, Math.PI * 2)
-      // Brighter yellow when swinging
-      ctx.fillStyle = swipe.isSwinging ? '#ffee55' : paddleColor
+      // Preserve role color during swings; only intensity changes.
+      ctx.fillStyle = paddleColor
       ctx.globalAlpha = 0.9
       ctx.fill()
       
