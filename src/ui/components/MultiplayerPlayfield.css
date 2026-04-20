@@ -6,7 +6,13 @@
   position: relative;
 }
 
-/* During waiting, game area shows a placeholder background */
+/* ============================================
+   WAITING STATE - Sidebar layout
+   ============================================ */
+.multiplayer-playfield--waiting {
+  flex-direction: row;
+}
+
 .multiplayer-playfield--waiting .game-area {
   display: flex;
   align-items: center;
@@ -18,74 +24,102 @@
   display: none;
 }
 
-/* Video sidebar stays in same position for waiting and playing */
-
-/* Sidebar status indicator */
-.sidebar-status {
+.multiplayer-playfield--waiting .video-sidebar {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 0.5rem;
-  margin-top: auto;
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #888;
-  flex-shrink: 0;
+.multiplayer-playfield--waiting .floating-opponent-video,
+.multiplayer-playfield--waiting .background-video {
+  display: none;
 }
 
-.status-dot--idle,
-.status-dot--initializing {
-  background: #ffc107;
-  animation: pulse 1.5s ease-in-out infinite;
+/* ============================================
+   PLAYING STATE - Floating video layout
+   ============================================ */
+.multiplayer-playfield:not(.multiplayer-playfield--waiting) .video-sidebar {
+  display: none;
 }
 
-.status-dot--connecting {
-  background: #2196f3;
-  animation: pulse 1s ease-in-out infinite;
-}
-
-.status-dot--connected {
-  background: #4caf50;
-}
-
-.status-dot--failed {
-  background: #f44336;
-}
-
-.status-text {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.8125rem;
-  font-family: 'Inter', sans-serif;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.game-area {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-
-.multiplayer-playfield .game-canvas {
-  width: 100%;
-  height: 100%;
+.multiplayer-playfield:not(.multiplayer-playfield--waiting) .floating-opponent-video,
+.multiplayer-playfield:not(.multiplayer-playfield--waiting) .background-video {
   display: block;
 }
 
+/* Background video (your camera - subtle) */
+.background-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  display: none;
+}
+
+.background-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  opacity: 0.15;
+  filter: blur(8px) saturate(0.5);
+}
+
+/* Floating opponent video (picture-in-picture style) */
+.floating-opponent-video {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 180px;
+  height: 135px;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid rgba(244, 67, 54, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  z-index: 25;
+  display: none;
+}
+
+.floating-opponent-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.floating-opponent-video .video-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.375rem 0.5rem;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+  color: #ef9a9a;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.floating-opponent-video .video-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.75rem;
+}
+
+/* ============================================
+   SIDEBAR (for waiting room)
+   ============================================ */
 .video-sidebar {
   width: 280px;
   min-width: 280px;
   flex-shrink: 0;
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 1rem;
   padding: 1rem;
@@ -150,10 +184,79 @@
   color: #ffe066;
 }
 
+/* Sidebar status indicator */
+.sidebar-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 0.5rem;
+  margin-top: auto;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #888;
+  flex-shrink: 0;
+}
+
+.status-dot--idle,
+.status-dot--initializing {
+  background: #ffc107;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-dot--connecting {
+  background: #2196f3;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.status-dot--connected {
+  background: #4caf50;
+}
+
+.status-dot--failed {
+  background: #f44336;
+}
+
+.status-text {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8125rem;
+  font-family: 'Inter', sans-serif;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ============================================
+   GAME AREA
+   ============================================ */
+.game-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.multiplayer-playfield .game-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 2;
+}
+
+/* ============================================
+   EXIT BUTTON
+   ============================================ */
 .exit-btn {
   position: absolute;
   top: 1rem;
-  right: 300px;
+  left: 1rem;
   width: 2.5rem;
   height: 2.5rem;
   border: none;
@@ -168,7 +271,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 20;
+  z-index: 30;
 }
 
 .exit-btn:hover {
@@ -178,55 +281,33 @@
   transform: scale(1.05);
 }
 
-.serve-prompt {
-  position: absolute;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, rgba(255, 221, 0, 0.15), rgba(255, 221, 0, 0.08));
-  border: 1px solid rgba(255, 221, 0, 0.25);
-  border-radius: 0.75rem;
-  padding: 0.75rem 1.5rem;
-  color: #ffe066;
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 1rem;
-  font-weight: 500;
-  animation: fadeInUp 0.3s ease-out;
-  z-index: 15;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-}
-
+/* ============================================
+   OVERLAYS
+   ============================================ */
 .multiplayer-playfield .point-overlay,
 .multiplayer-playfield .countdown-overlay,
 .multiplayer-playfield .gameover-overlay {
-  right: 280px;
-  width: auto;
+  z-index: 50;
 }
 
+/* ============================================
+   MOBILE RESPONSIVE
+   ============================================ */
 @media (max-width: 900px) {
-  .multiplayer-playfield {
+  /* Waiting state on mobile */
+  .multiplayer-playfield--waiting {
     flex-direction: column;
     min-height: 100vh;
   }
 
-  .game-area {
+  .multiplayer-playfield--waiting .game-area {
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
   }
 
-  .video-sidebar {
+  .multiplayer-playfield--waiting .video-sidebar {
     width: 100%;
     flex-direction: row;
     height: 100px;
@@ -236,45 +317,51 @@
     order: -1;
   }
 
-  .video-container {
+  .multiplayer-playfield--waiting .video-container {
     aspect-ratio: auto;
     height: 100%;
   }
 
-  .opponent-video {
+  .multiplayer-playfield--waiting .opponent-video {
     flex: 2;
   }
 
-  .local-video {
+  .multiplayer-playfield--waiting .local-video {
     flex: 1;
     height: auto;
-  }
-
-  .exit-btn {
-    right: 1rem;
-    top: 110px;
-  }
-
-  .multiplayer-playfield .point-overlay,
-  .multiplayer-playfield .countdown-overlay,
-  .multiplayer-playfield .gameover-overlay {
-    right: 0;
-    top: 100px;
-    bottom: 0;
-    height: auto;
-    width: 100%;
   }
 
   /* Make waiting room fill the game area properly on mobile */
-  .multiplayer-playfield--waiting .game-area {
-    flex: 1;
-  }
-
   .waiting-room {
     position: relative;
     flex: 1;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+  }
+
+  /* Playing state on mobile */
+  .multiplayer-playfield:not(.multiplayer-playfield--waiting) {
+    min-height: 100vh;
+  }
+
+  .floating-opponent-video {
+    width: 120px;
+    height: 90px;
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+
+  .floating-opponent-video .video-label {
+    font-size: 0.625rem;
+    padding: 0.25rem 0.375rem;
+  }
+
+  .exit-btn {
+    top: 0.75rem;
+    left: 0.75rem;
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.9rem;
   }
 }

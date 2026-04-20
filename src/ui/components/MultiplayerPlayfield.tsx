@@ -393,8 +393,8 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   // Auto-serve when phase changes to 'serving'
   useEffect(() => {
     if (phase !== 'serving') return
-    
-    // Small delay before auto-serve for visual feedback
+
+    // Delay before auto-serve so players can see "Get ready!" message
     const timer = setTimeout(() => {
       if (isHost) {
         // Host always executes the serve
@@ -403,8 +403,8 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         // Guest sends serve request to host
         gameSyncService.sendServeRequest()
       }
-    }, 500)
-    
+    }, 2000) // 2 second delay for players to prepare
+
     return () => clearTimeout(timer)
   }, [phase, isHost, doServe])
 
@@ -484,7 +484,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         )}
       </div>
 
-      {/* Video sidebar - same layout for waiting and playing */}
+      {/* Video sidebar - for waiting room only */}
       <div className="video-sidebar">
         <div className="video-container opponent-video">
           <video
@@ -516,30 +516,65 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         </div>
 
         {/* Connection status in sidebar */}
-        {isWaiting && (
-          <div className="sidebar-status">
-            <span className={`status-dot status-dot--${
-              handTrackerStatus === 'permission-denied' ? 'failed' 
-              : !localStream ? 'initializing' 
-              : connectionState
-            }`} />
-            <span className="status-text">
-              {handTrackerStatus === 'initializing'
-                ? 'Loading camera...'
-                : handTrackerStatus === 'permission-denied'
-                  ? 'Camera denied'
-                  : !localStream 
-                    ? 'Starting camera...'
-                    : connectionState === 'connected' 
-                      ? 'Connected' 
-                      : connectionState === 'connecting' 
-                        ? 'Connecting...'
-                        : opponent 
-                          ? 'Waiting for video...'
-                          : 'Ready'}
-            </span>
+        <div className="sidebar-status">
+          <span className={`status-dot status-dot--${
+            handTrackerStatus === 'permission-denied' ? 'failed' 
+            : !localStream ? 'initializing' 
+            : connectionState
+          }`} />
+          <span className="status-text">
+            {handTrackerStatus === 'initializing'
+              ? 'Loading camera...'
+              : handTrackerStatus === 'permission-denied'
+                ? 'Camera denied'
+                : !localStream 
+                  ? 'Starting camera...'
+                  : connectionState === 'connected' 
+                    ? 'Connected' 
+                    : connectionState === 'connecting' 
+                      ? 'Connecting...'
+                      : opponent 
+                        ? 'Waiting for video...'
+                        : 'Ready'}
+          </span>
+        </div>
+      </div>
+
+      {/* Floating opponent video - for gameplay (uses same stream as sidebar) */}
+      <div className="floating-opponent-video">
+        <video
+          className="video-feed"
+          playsInline
+          muted
+          autoPlay
+          ref={(el) => {
+            if (el && remoteStream && el.srcObject !== remoteStream) {
+              el.srcObject = remoteStream
+              el.play().catch(() => {})
+            }
+          }}
+        />
+        <div className="video-label">{opponent?.name || 'Opponent'}</div>
+        {!remoteStream && (
+          <div className="video-overlay">
+            <span>Connecting...</span>
           </div>
         )}
+      </div>
+
+      {/* Background video (your camera - subtle ambient) */}
+      <div className="background-video">
+        <video
+          playsInline
+          muted
+          autoPlay
+          ref={(el) => {
+            if (el && localStream && el.srcObject !== localStream) {
+              el.srcObject = localStream
+              el.play().catch(() => {})
+            }
+          }}
+        />
       </div>
 
       <button className="exit-btn" onClick={handleExit} title="Leave game">
