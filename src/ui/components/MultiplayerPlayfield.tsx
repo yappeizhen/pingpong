@@ -248,7 +248,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
             gameSyncService.sendBall(ballState)
           }
         }
-      }, 33) // ~30 times per second for smoother sync
+      }, 50) // 20 times per second
     }
 
     return () => {
@@ -298,21 +298,19 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
         case 'ball':
           if (!isHost && gameRef.current) {
-            // Guest receives ball state - flip perspective so they see from opposite side
-            gameRef.current.setRemoteBallState(message.ball, true)
+            gameRef.current.setRemoteBallState(message.ball)
           }
           break
 
         case 'serve':
           console.log('[MultiplayerPlayfield] Received serve message, player:', message.player, 'seed:', message.seed)
-          // Guest: just update phase and wait for ball state from host
-          // Host: run serve locally (this shouldn't normally happen since host sends serve, not receives)
-          if (isHost && gameRef.current) {
+          if (gameRef.current) {
             gameRef.current.serve(message.player, message.seed)
+            setServingPlayer(message.player)
+            setPhase('playing')
+          } else {
+            console.warn('[MultiplayerPlayfield] Cannot apply serve: gameRef is null!')
           }
-          // Both: update serving player and phase
-          setServingPlayer(message.player)
-          setPhase('playing')
           break
 
         case 'serve-request':
