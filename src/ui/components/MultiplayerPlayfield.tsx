@@ -248,7 +248,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
             gameSyncService.sendBall(ballState)
           }
         }
-      }, 50) // 20 times per second
+      }, 33) // ~30 times per second for smoother sync
     }
 
     return () => {

@@ -29,6 +29,7 @@ export class PongGame {
   
   private isGuestMode = false
   private remoteBallState: BallState | null = null
+  private interpolatedPosition: { x: number; y: number; z: number } | null = null
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -314,6 +315,8 @@ export class PongGame {
     } else {
       this.remoteBallState = state
     }
+    // Reset interpolation to snap to authoritative position from host
+    this.interpolatedPosition = { ...this.remoteBallState.position }
     this.physics.setState(this.remoteBallState)
   }
 
@@ -366,9 +369,18 @@ export class PongGame {
     let ballState: BallState
 
     if (this.isGuestMode && this.remoteBallState) {
-      // Guest mode: just display host's ball state
-      // Host is authoritative for all physics and point detection
-      ballState = this.remoteBallState
+      // Guest mode: interpolate between updates for smooth visuals
+      // Use velocity to extrapolate position since last host update
+      // This runs at 60fps while host updates come at 20fps
+      this.interpolatedPosition = this.interpolatedPosition ?? { ...this.remoteBallState.position }
+      this.interpolatedPosition.x += this.remoteBallState.velocity.x * delta
+      this.interpolatedPosition.y += this.remoteBallState.velocity.y * delta
+      this.interpolatedPosition.z += this.remoteBallState.velocity.z * delta
+      
+      ballState = {
+        ...this.remoteBallState,
+        position: this.interpolatedPosition,
+      }
     } else if (this.isGuestMode) {
       // Guest mode but no remote state yet - just use current physics state
       ballState = this.physics.getState()
