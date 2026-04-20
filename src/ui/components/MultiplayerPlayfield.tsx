@@ -45,6 +45,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     player1,
     player2,
     servingPlayer,
+    lastScorer,
     seed,
     setPhase,
     scorePoint,
@@ -349,6 +350,35 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
             : 'Opponent serving...'}
         </div>
       )}
+
+      {phase === 'point-scored' && (
+        <PointScoredOverlay
+          lastScorer={lastScorer}
+          isHost={isHost}
+          opponentName={opponent?.name || 'Opponent'}
+        />
+      )}
+    </div>
+  )
+}
+
+function PointScoredOverlay({
+  lastScorer,
+  isHost,
+  opponentName,
+}: {
+  lastScorer: 'player1' | 'player2' | null
+  isHost: boolean
+  opponentName: string
+}) {
+  const isYourPoint =
+    (lastScorer === 'player1' && isHost) ||
+    (lastScorer === 'player2' && !isHost)
+
+  return (
+    <div className="point-overlay">
+      <span className="point-text">Point!</span>
+      <span className="point-scorer">{isYourPoint ? 'You' : opponentName}</span>
     </div>
   )
 }

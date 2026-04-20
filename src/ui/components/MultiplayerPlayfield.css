@@ -141,6 +141,45 @@
   }
 }
 
+.point-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 280px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 50;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.point-text {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 4rem;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+}
+
+.point-scorer {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.5rem;
+  color: #4ade80;
+  margin-top: 0.5rem;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (max-width: 900px) {
   .multiplayer-playfield {
     flex-direction: column;
@@ -171,5 +210,12 @@
   .exit-btn {
     right: 1rem;
     top: 1rem;
+  }
+
+  .point-overlay {
+    right: 0;
+    bottom: 120px;
+    height: auto;
+    top: 0;
   }
 }
