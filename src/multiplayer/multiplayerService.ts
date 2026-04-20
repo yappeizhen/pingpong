@@ -91,7 +91,8 @@ export async function createRoom(playerName: string): Promise<Room | null> {
       id: roomId,
       ...roomData,
     }
-  } catch {
+  } catch (error) {
+    console.error('[Multiplayer] createRoom error:', error)
     return null
   }
 }
@@ -121,7 +122,8 @@ export async function findRoomByCode(code: string): Promise<Room | null> {
       id: roomDoc.id,
       ...data,
     }
-  } catch {
+  } catch (error) {
+    console.error('[Multiplayer] findRoomByCode error:', error)
     return null
   }
 }

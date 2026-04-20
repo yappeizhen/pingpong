@@ -1,6 +1,6 @@
 .multiplayer-menu {
   width: 100%;
-  height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -216,17 +216,48 @@
   box-sizing: border-box;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 600px) {
+  .multiplayer-menu {
+    justify-content: flex-start;
+    padding-top: 3rem;
+    padding-bottom: 2rem;
+  }
+
+  .menu-content {
+    gap: 1.25rem;
+  }
+
+  .menu-icon {
+    font-size: 3rem;
+  }
+
   .menu-title {
     font-size: 2rem;
+  }
+
+  .menu-subtitle {
+    font-size: 0.9375rem;
   }
 
   .option-button {
     padding: 1rem;
   }
 
+  .option-icon {
+    font-size: 1.75rem;
+  }
+
+  .option-title {
+    font-size: 1rem;
+  }
+
   .code-input {
     font-size: 1.5rem;
     letter-spacing: 0.3rem;
+    padding: 0.875rem;
+  }
+
+  .action-btn {
+    padding: 0.875rem;
   }
 }
