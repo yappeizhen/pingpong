@@ -309,10 +309,21 @@ export class PongGame {
         CAMERA.LOOK_AT.y,
         -CAMERA.LOOK_AT.z
       )
+      // Swap paddle colors so local player always sees yellow, opponent sees red
+      const paddle1Mat = this.paddle1.material as THREE.MeshStandardMaterial
+      const paddle2Mat = this.paddle2.material as THREE.MeshStandardMaterial
+      paddle1Mat.color.setHex(PADDLE.OPPONENT_COLOR) // Host's paddle appears red to guest
+      paddle2Mat.color.setHex(PADDLE.COLOR) // Guest's own paddle appears yellow
     } else {
       // Reset to default camera position
       this.camera.position.set(CAMERA.POSITION.x, CAMERA.POSITION.y, CAMERA.POSITION.z)
       this.camera.lookAt(CAMERA.LOOK_AT.x, CAMERA.LOOK_AT.y, CAMERA.LOOK_AT.z)
+      
+      // Reset paddle colors to defaults
+      const paddle1Mat = this.paddle1.material as THREE.MeshStandardMaterial
+      const paddle2Mat = this.paddle2.material as THREE.MeshStandardMaterial
+      paddle1Mat.color.setHex(PADDLE.COLOR) // Host's own paddle is yellow
+      paddle2Mat.color.setHex(PADDLE.OPPONENT_COLOR) // Guest's paddle appears red to host
     }
   }
 
