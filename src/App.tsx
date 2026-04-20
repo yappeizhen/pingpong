@@ -10,13 +10,15 @@ import '@fontsource/space-grotesk/700.css'
 import './App.css'
 
 function App() {
-  const { phase } = useGameStore()
+  const { phase, mode } = useGameStore()
 
-  const isPlaying = phase !== 'idle'
+  // Only show single-player Playfield when actively playing in solo mode
+  // Multiplayer mode handles its own playfield inside StartScreen -> MultiplayerMenu -> MultiplayerPlayfield
+  const showSoloPlayfield = phase !== 'idle' && mode === 'solo'
 
   return (
     <HandTrackerProvider maxHands={2}>
-      <div className="app">{isPlaying ? <Playfield /> : <StartScreen />}</div>
+      <div className="app">{showSoloPlayfield ? <Playfield /> : <StartScreen />}</div>
     </HandTrackerProvider>
   )
 }

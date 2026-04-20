@@ -42,12 +42,14 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
   const {
     phase,
+    mode,
     player1,
     player2,
     servingPlayer,
     lastScorer,
     seed,
     setPhase,
+    setMode,
     scorePoint,
     resetGame,
   } = useGameStore()
@@ -56,6 +58,13 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null)
   const [showCountdown, setShowCountdown] = useState(false)
   const playerId = getPlayerId()
+
+  // Set mode to multiplayer on mount
+  useEffect(() => {
+    if (mode !== 'multiplayer') {
+      setMode('multiplayer')
+    }
+  }, [mode, setMode])
 
   // Handle data channel from WebRTC
   const handleDataChannel = useCallback((channel: RTCDataChannel) => {
@@ -351,8 +360,10 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
   const handleExit = useCallback(async () => {
     await leaveRoom()
+    setMode('solo') // Reset mode when leaving multiplayer
+    resetGame()
     onExit()
-  }, [leaveRoom, onExit])
+  }, [leaveRoom, setMode, resetGame, onExit])
 
   const handlePlayAgain = useCallback(() => {
     resetGame()
