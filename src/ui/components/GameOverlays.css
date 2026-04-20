@@ -302,9 +302,18 @@
   font-family: 'Inter', sans-serif;
   font-size: 1.125rem;
   color: rgba(255, 255, 255, 0.8);
-  font-style: italic;
   margin: 0;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.gameover-result-line {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.95);
+  font-style: normal;
 }
 
 .gameover-buttons {

@@ -522,6 +522,10 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     (player1.score > player2.score && isHost) ||
     (player2.score > player1.score && !isHost)
 
+  const gameOverScore = isHost
+    ? { player1: player1.score, player2: player2.score }
+    : { player1: player2.score, player2: player1.score }
+
   // Show waiting room with video preview - keep both video elements mounted for WebRTC
   const isWaiting = roomState === 'waiting'
 
@@ -553,9 +557,9 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
         {phase === 'game-over' && (
           <GameOverOverlay
-            score={{ player1: player1.score, player2: player2.score }}
-            player1Name={isHost ? 'You' : (opponent?.name || 'Opponent')}
-            player2Name={isHost ? (opponent?.name || 'Opponent') : 'You'}
+            score={gameOverScore}
+            player1Name="You"
+            player2Name={opponent?.name || 'Opponent'}
             onPlayAgain={handlePlayAgain}
             onExit={handleExit}
             isVictory={isYourWin}

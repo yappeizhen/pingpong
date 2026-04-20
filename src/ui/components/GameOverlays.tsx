@@ -74,6 +74,10 @@ export function GameOverOverlay({
 
   const totalPoints = score.player1 + score.player2
   const winMargin = Math.abs(score.player1 - score.player2)
+  const marginLabel = isVictory ? 'Win Margin' : 'Loss Margin'
+  const resultMessage = isVictory
+    ? `You beat ${player2Name} ${score.player1}-${score.player2}`
+    : `${player2Name} beat you ${score.player2}-${score.player1}`
 
   return (
     <div className={`gameover-overlay ${isVictory ? 'victory' : 'defeat'}`}>
@@ -113,11 +117,12 @@ export function GameOverOverlay({
           </div>
           <div className="stat-item">
             <span className="stat-value">+{winMargin}</span>
-            <span className="stat-label">Point Margin</span>
+            <span className="stat-label">{marginLabel}</span>
           </div>
         </div>
 
         <p className="gameover-message">
+          <span className="gameover-result-line">{resultMessage}</span>
           {isVictory 
             ? winMargin >= 5 ? 'Dominant performance!' : 'Well played!'
             : winMargin >= 5 ? 'Better luck next time!' : 'So close!'}
