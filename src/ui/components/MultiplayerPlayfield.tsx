@@ -27,6 +27,8 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const localStreamRef = useRef<MediaStream | null>(null)
   const serveTriggeredRef = useRef(false)
   const triggerServeRef = useRef<(() => void) | null>(null)
+  const phaseRef = useRef<string>('idle')
+  const servingPlayerRef = useRef<'player1' | 'player2'>('player1')
 
   // Get videoRef callback from hand tracker (like frootninja)
   const { videoRef, status: handTrackerStatus } = useHandData()
@@ -53,6 +55,10 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     scorePoint,
     resetGame,
   } = useGameStore()
+
+  // Keep refs in sync for use in callbacks
+  phaseRef.current = phase
+  servingPlayerRef.current = servingPlayer
 
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null)
@@ -195,17 +201,15 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
       }
 
       // Swipe to serve - detect if it's the player's turn and they're swiping
-      if (phase === 'serving' && state.isSwinging && state.swipeSpeed > 0.3) {
+      if (state.isSwinging && state.swipeSpeed > 0.3) {
         const myPlayer = isHost ? 'player1' : 'player2'
         const isMyServe = servingPlayer === myPlayer
-        
-        if (isMyServe) {
-          console.log('[MultiplayerPlayfield] Swipe detected for serve, triggering serve')
-          // Use a ref to prevent multiple serves from one swipe
-          if (!serveTriggeredRef.current) {
-            serveTriggeredRef.current = true
-            triggerServeRef.current?.()
-          }
+        console.log('[MultiplayerPlayfield] Swipe detected! phase:', phase, 'isMyServe:', isMyServe, 'myPlayer:', myPlayer, 'servingPlayer:', servingPlayer, 'serveTriggered:', serveTriggeredRef.current)
+
+        if (phase === 'serving' && isMyServe && !serveTriggeredRef.current) {
+          console.log('[MultiplayerPlayfield] Triggering serve!')
+          serveTriggeredRef.current = true
+          triggerServeRef.current?.()
         }
       }
     },
@@ -317,12 +321,12 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
         case 'serve-request':
           // Guest requested a serve - host executes it
-          console.log('[MultiplayerPlayfield] Received serve request from guest')
-          if (isHost && gameRef.current && phase === 'serving') {
+          console.log('[MultiplayerPlayfield] Received serve request from guest, phase:', phaseRef.current, 'servingPlayer:', servingPlayerRef.current)
+          if (isHost && gameRef.current && phaseRef.current === 'serving') {
             const serveSeed = Date.now()
-            console.log('[MultiplayerPlayfield] Host executing serve for guest, player:', servingPlayer)
-            gameRef.current.serve(servingPlayer, serveSeed)
-            gameSyncService.sendServe(servingPlayer, serveSeed)
+            console.log('[MultiplayerPlayfield] Host executing serve for guest, player:', servingPlayerRef.current)
+            gameRef.current.serve(servingPlayerRef.current, serveSeed)
+            gameSyncService.sendServe(servingPlayerRef.current, serveSeed)
             setPhase('playing')
           }
           break
