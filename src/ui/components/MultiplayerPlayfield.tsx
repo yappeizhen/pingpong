@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { PongGame } from '@/game'
-import { useHandData, extractPalmPosition, getPrimaryHand, handToPaddlePosition, SwipeDetector } from '@/cv'
+import { useHandData } from '@/cv'
+import { useHandController, type HandControllerState } from '@/hooks'
 import { useMultiplayerRoom, getPlayerId } from '@/multiplayer'
 import {
   createPeerConnection,
@@ -13,6 +14,11 @@ import type { GameSyncMessage, WebRTCConnection } from '@/multiplayer/types'
 import { HandOverlay } from './HandOverlay'
 import { GameHUD } from './GameHUD'
 import { useGameStore } from '@/state'
+import {
+  CountdownOverlay,
+  PointScoredOverlay,
+  GameOverOverlay,
+} from './GameOverlays'
 import './MultiplayerPlayfield.css'
 
 interface MultiplayerPlayfieldProps {
@@ -24,11 +30,10 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const gameRef = useRef<PongGame | null>(null)
-  const swipeDetectorRef = useRef<SwipeDetector | null>(null)
   const connectionRef = useRef<WebRTCConnection | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
 
-  const { frame, startTracking } = useHandData()
+  const { startTracking } = useHandData()
   const {
     roomId,
     roomState,
@@ -49,18 +54,48 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     seed,
     setPhase,
     scorePoint,
+    resetGame,
   } = useGameStore()
 
   const [isConnecting, setIsConnecting] = useState(true)
   const [connectionStatus, setConnectionStatus] = useState<string>('Connecting...')
+  const [showCountdown, setShowCountdown] = useState(false)
   const playerId = getPlayerId()
+
+  const handlePaddleUpdate = useCallback(
+    (state: HandControllerState) => {
+      if (!gameRef.current) return
+
+      const paddleState = {
+        position: state.position,
+        velocity: state.velocity,
+        isActive: state.isActive,
+        isSwinging: state.isSwinging,
+        swipeSpeed: state.swipeSpeed,
+        hand: state.hand,
+      }
+
+      gameRef.current.setPlayer1Paddle(paddleState)
+      gameSyncService.sendPaddle(playerId, paddleState)
+
+      if (isHost && phase === 'playing') {
+        const ballState = gameRef.current.getBallState()
+        gameSyncService.sendBall(ballState)
+      }
+    },
+    [playerId, isHost, phase]
+  )
+
+  useHandController({
+    preferredHand: 'Right',
+    onStateChange: handlePaddleUpdate,
+  })
 
   useEffect(() => {
     if (!canvasRef.current) return
 
     const game = new PongGame(canvasRef.current)
     gameRef.current = game
-    swipeDetectorRef.current = new SwipeDetector()
 
     game.setGuestMode(!isHost)
 
@@ -81,7 +116,6 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     return () => {
       game.dispose()
       gameRef.current = null
-      swipeDetectorRef.current = null
     }
   }, [scorePoint, isHost])
 
@@ -129,6 +163,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
           gameSyncService.setDataChannel(dataChannel, isHost)
           setIsConnecting(false)
           setConnectionStatus('Connected!')
+          setShowCountdown(true)
         }
       )
 
@@ -202,102 +237,56 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     return unsubscribe
   }, [isHost, playerId, scorePoint, setPhase])
 
-  const lastPaddlePosRef = useRef({ x: 0.5, y: 0.5 })
-  const lastActiveTimeRef = useRef<number>(0)
-  const lastSwipeRef = useRef({ velocity: { x: 0, y: 0 }, isSwinging: false, speed: 0 })
-  const ACTIVE_GRACE_PERIOD = 300
-
-  useEffect(() => {
-    if (!frame || !gameRef.current || !swipeDetectorRef.current) return
-
-    const primaryHand = getPrimaryHand(frame.hands, 'Right')
-    const now = performance.now()
-
-    if (primaryHand) {
-      const palm = extractPalmPosition(primaryHand)
-      const paddlePos = handToPaddlePosition(palm, primaryHand)
-      const swipe = swipeDetectorRef.current.update(palm.isOpen ? palm : null)
-
-      lastPaddlePosRef.current = paddlePos
-
-      if (palm.isOpen) {
-        lastActiveTimeRef.current = now
-        lastSwipeRef.current = swipe
-      }
-
-      const paddleState = {
-        position: paddlePos,
-        velocity: swipe.velocity,
-        isActive: palm.isOpen,
-        isSwinging: swipe.isSwinging,
-        swipeSpeed: swipe.speed,
-        hand: primaryHand.handedness,
-      }
-
-      gameRef.current.setPlayer1Paddle(paddleState)
-      gameSyncService.sendPaddle(playerId, paddleState)
-
-      if (isHost && phase === 'playing') {
-        const ballState = gameRef.current.getBallState()
-        gameSyncService.sendBall(ballState)
-      }
-    } else {
-      swipeDetectorRef.current.update(null)
-
-      const timeSinceActive = now - lastActiveTimeRef.current
-      const inGracePeriod = timeSinceActive < ACTIVE_GRACE_PERIOD
-
-      const paddleState = {
-        position: lastPaddlePosRef.current,
-        velocity: inGracePeriod ? lastSwipeRef.current.velocity : { x: 0, y: 0 },
-        isActive: inGracePeriod,
-        isSwinging: inGracePeriod && lastSwipeRef.current.isSwinging,
-        swipeSpeed: inGracePeriod ? lastSwipeRef.current.speed : 0,
-        hand: null,
-      }
-
-      gameRef.current.setPlayer1Paddle(paddleState)
-      gameSyncService.sendPaddle(playerId, paddleState)
-    }
-  }, [frame, phase, isHost, playerId])
-
   useEffect(() => {
     if (roomState === 'playing' && phase !== 'playing' && phase !== 'serving') {
       setPhase('serving')
     }
   }, [roomState, phase, setPhase])
 
-  const handleServe = useCallback(() => {
-    if (phase !== 'serving' || !gameRef.current) return
+  const doServe = useCallback(() => {
+    if (!gameRef.current) return
 
-    const isMyServe =
-      (servingPlayer === 'player1' && isHost) ||
-      (servingPlayer === 'player2' && !isHost)
-
-    if (isMyServe) {
+    if (isHost) {
       gameRef.current.serve(servingPlayer, seed)
       gameSyncService.sendServe(servingPlayer, seed)
-      setPhase('playing')
     }
-  }, [phase, servingPlayer, isHost, seed, setPhase])
+    setPhase('playing')
+  }, [servingPlayer, isHost, seed, setPhase])
 
   useEffect(() => {
-    if (phase === 'serving' && frame) {
-      const primaryHand = getPrimaryHand(frame.hands, 'Right')
-      if (primaryHand) {
-        const palm = extractPalmPosition(primaryHand)
-        const swipe = swipeDetectorRef.current?.update(palm.isOpen ? palm : null)
-        if (palm.isOpen && swipe?.isSwinging) {
-          handleServe()
-        }
-      }
+    if (phase === 'point-scored') {
+      gameRef.current?.reset()
+      const timer = setTimeout(() => {
+        doServe()
+      }, 2000)
+      return () => clearTimeout(timer)
     }
-  }, [phase, frame, handleServe])
+  }, [phase, doServe])
+
+  const handleCountdownComplete = useCallback(() => {
+    setShowCountdown(false)
+    doServe()
+  }, [doServe])
 
   const handleExit = useCallback(async () => {
     await leaveRoom()
     onExit()
   }, [leaveRoom, onExit])
+
+  const handlePlayAgain = useCallback(() => {
+    resetGame()
+    setShowCountdown(true)
+  }, [resetGame])
+
+  const isYourPoint =
+    (lastScorer === 'player1' && isHost) ||
+    (lastScorer === 'player2' && !isHost)
+  const scorerName = isYourPoint ? 'You' : (opponent?.name || 'Opponent')
+
+  const isYourWin =
+    (player1.score > player2.score && isHost) ||
+    (player2.score > player1.score && !isHost)
+  const winnerName = isYourWin ? 'You' : (opponent?.name || 'Opponent')
 
   return (
     <div className="multiplayer-playfield">
@@ -305,6 +294,26 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         <canvas ref={canvasRef} className="game-canvas" />
         <HandOverlay paddleSize={0.035} paddleColor="#ffdd00" showDebug={false} />
         <GameHUD />
+
+        {showCountdown && (
+          <CountdownOverlay onComplete={handleCountdownComplete} />
+        )}
+
+        {phase === 'point-scored' && (
+          <PointScoredOverlay scorerName={scorerName} />
+        )}
+
+        {phase === 'game-over' && (
+          <GameOverOverlay
+            winnerName={winnerName}
+            score={{ player1: player1.score, player2: player2.score }}
+            player1Name={isHost ? 'You' : (opponent?.name || 'Opponent')}
+            player2Name={isHost ? (opponent?.name || 'Opponent') : 'You'}
+            onPlayAgain={handlePlayAgain}
+            onExit={handleExit}
+            showExit
+          />
+        )}
       </div>
 
       <div className="video-sidebar">
@@ -341,44 +350,6 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
       <button className="exit-btn" onClick={handleExit} title="Leave game">
         ✕
       </button>
-
-      {phase === 'serving' && (
-        <div className="serve-prompt">
-          {(servingPlayer === 'player1' && isHost) ||
-          (servingPlayer === 'player2' && !isHost)
-            ? 'Your serve - swipe to serve!'
-            : 'Opponent serving...'}
-        </div>
-      )}
-
-      {phase === 'point-scored' && (
-        <PointScoredOverlay
-          lastScorer={lastScorer}
-          isHost={isHost}
-          opponentName={opponent?.name || 'Opponent'}
-        />
-      )}
-    </div>
-  )
-}
-
-function PointScoredOverlay({
-  lastScorer,
-  isHost,
-  opponentName,
-}: {
-  lastScorer: 'player1' | 'player2' | null
-  isHost: boolean
-  opponentName: string
-}) {
-  const isYourPoint =
-    (lastScorer === 'player1' && isHost) ||
-    (lastScorer === 'player2' && !isHost)
-
-  return (
-    <div className="point-overlay">
-      <span className="point-text">Point!</span>
-      <span className="point-scorer">{isYourPoint ? 'You' : opponentName}</span>
     </div>
   )
 }
