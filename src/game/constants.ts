@@ -46,7 +46,7 @@ export const CAMERA = {
 } as const
 
 export const GAME = {
-  POINTS_TO_WIN: 11,
+  POINTS_TO_WIN: 7,
   SERVE_SWITCH_INTERVAL: 2,
   COUNTDOWN_SECONDS: 3,
   RALLY_TIMEOUT_MS: 10000,
