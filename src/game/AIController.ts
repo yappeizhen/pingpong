@@ -2,12 +2,12 @@ import { TABLE, PHYSICS, BALL } from './constants'
 import type { BallState, PaddleState } from '@/types'
 
 const AI_CONFIG = {
-  reactionDelay: 5,
-  speed: 0.24,
-  predictionError: 0.002,
-  anticipation: 0.95,
-  aggression: 0.85,
-  trackingAccuracy: 0.99,
+  reactionDelay: 24,
+  speed: 0.18,
+  predictionError: 0.016,
+  anticipation: 0.82,
+  aggression: 0.68,
+  trackingAccuracy: 0.9,
 } as const
 
 export class AIController {
