@@ -25,6 +25,8 @@ const REMOTE_PADDLE_MIN_COMP_MS = 16
 const REMOTE_PADDLE_MAX_COMP_MS = 140
 const REMOTE_PADDLE_MAX_LEAD = 0.18
 const HOST_BALL_SYNC_INTERVAL_MS = 16
+const HOST_BALL_SYNC_MIN_INTERVAL_MS = 16
+const HOST_BALL_SYNC_MAX_INTERVAL_MS = 50
 
 export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -293,21 +295,50 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     game.start()
 
     // Host sends ball state at regular intervals (not just on paddle movement)
-    let ballSyncInterval: ReturnType<typeof setInterval> | null = null
+    let ballSyncTimer: ReturnType<typeof setTimeout> | null = null
+    let isDisposed = false
     if (isHost) {
-      ballSyncInterval = setInterval(() => {
+      let syncIntervalMs = HOST_BALL_SYNC_INTERVAL_MS
+
+      const scheduleNextSync = (delayMs: number) => {
+        if (isDisposed) return
+        ballSyncTimer = setTimeout(syncBallState, delayMs)
+      }
+
+      const syncBallState = () => {
+        if (isDisposed) return
+
+        let attemptedSend = false
+        let wasSent = false
+
         if (gameRef.current && gameSyncService.isConnected()) {
           const ballState = gameRef.current.getBallState()
           if (ballState.isInPlay) {
-            gameSyncService.sendBall(ballState)
+            attemptedSend = true
+            wasSent = gameSyncService.sendBall(ballState)
           }
         }
-      }, HOST_BALL_SYNC_INTERVAL_MS)
+
+        if (attemptedSend) {
+          if (wasSent) {
+            syncIntervalMs = Math.max(HOST_BALL_SYNC_MIN_INTERVAL_MS, syncIntervalMs - 1)
+          } else {
+            syncIntervalMs = Math.min(HOST_BALL_SYNC_MAX_INTERVAL_MS, syncIntervalMs + 4)
+          }
+        } else {
+          syncIntervalMs = Math.max(HOST_BALL_SYNC_MIN_INTERVAL_MS, syncIntervalMs - 1)
+        }
+
+        scheduleNextSync(syncIntervalMs)
+      }
+
+      scheduleNextSync(syncIntervalMs)
     }
 
     return () => {
-      if (ballSyncInterval) {
-        clearInterval(ballSyncInterval)
+      isDisposed = true
+      if (ballSyncTimer) {
+        clearTimeout(ballSyncTimer)
       }
       game.dispose()
       gameRef.current = null

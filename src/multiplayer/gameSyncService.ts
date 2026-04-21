@@ -97,10 +97,10 @@ export class GameSyncService {
     return reliable ?? transient
   }
 
-  private send(message: GameSyncMessage) {
+  private send(message: GameSyncMessage): boolean {
     const channel = this.selectChannel(message)
     if (!channel) {
-      return
+      return false
     }
 
     if (
@@ -108,13 +108,15 @@ export class GameSyncService {
       channel === this.transientChannel &&
       channel.bufferedAmount > this.transientBackpressureLimit
     ) {
-      return
+      return false
     }
 
     try {
       channel.send(JSON.stringify(message))
+      return true
     } catch {
       // Ignore send errors
+      return false
     }
   }
 
@@ -129,7 +131,7 @@ export class GameSyncService {
   }
 
   sendBall(ball: BallState) {
-    if (!this.isHost) return
+    if (!this.isHost) return false
 
     const message: BallSyncMessage = {
       type: 'ball',
@@ -137,7 +139,7 @@ export class GameSyncService {
       seq: ++this.ballSequence,
       timestamp: Date.now(),
     }
-    this.send(message)
+    return this.send(message)
   }
 
   sendServe(player: Player, seed: number) {
