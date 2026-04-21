@@ -35,7 +35,11 @@ export class PongGame {
   private isGuestMode = false
   private remoteBallState: BallState | null = null
   private remoteBallFrames: RemoteBallFrame[] = []
-  private readonly remoteInterpolationDelayMs = 50
+  private remoteFrameIntervalAvgMs = 50
+  private remoteFrameJitterAvgMs = 0
+  private readonly remoteInterpolationMinMs = 18
+  private readonly remoteInterpolationMaxMs = 110
+  private readonly remoteJitterMultiplier = 2
   private readonly remoteMaxExtrapolationMs = 90
 
   constructor(canvas: HTMLCanvasElement) {
@@ -330,8 +334,18 @@ export class PongGame {
 
   setRemoteBallState(state: BallState, receivedAt = performance.now()) {
     const copiedState = this.cloneBallState(state)
+    const previousFrame = this.remoteBallFrames[this.remoteBallFrames.length - 1]
     this.remoteBallState = copiedState
     this.remoteBallFrames.push({ state: copiedState, receivedAt })
+
+    if (previousFrame) {
+      const intervalMs = receivedAt - previousFrame.receivedAt
+      if (Number.isFinite(intervalMs) && intervalMs > 0 && intervalMs < 1000) {
+        this.remoteFrameIntervalAvgMs = this.lerp(this.remoteFrameIntervalAvgMs, intervalMs, 0.2)
+        const deviationMs = Math.abs(intervalMs - this.remoteFrameIntervalAvgMs)
+        this.remoteFrameJitterAvgMs = this.lerp(this.remoteFrameJitterAvgMs, deviationMs, 0.2)
+      }
+    }
 
     if (this.remoteBallFrames.length > 24) {
       this.remoteBallFrames.splice(0, this.remoteBallFrames.length - 24)
@@ -343,6 +357,8 @@ export class PongGame {
   clearRemoteSync() {
     this.remoteBallFrames = []
     this.remoteBallState = null
+    this.remoteFrameIntervalAvgMs = 50
+    this.remoteFrameJitterAvgMs = 0
   }
 
   start() {
@@ -468,7 +484,8 @@ export class PongGame {
       return this.remoteBallState ?? this.physics.getState()
     }
 
-    const renderTime = now - this.remoteInterpolationDelayMs
+    const interpolationDelayMs = this.getAdaptiveInterpolationDelayMs()
+    const renderTime = now - interpolationDelayMs
 
     while (
       this.remoteBallFrames.length >= 2 &&
@@ -507,6 +524,15 @@ export class PongGame {
         z: latest.state.position.z + latest.state.velocity.z * dtSeconds,
       },
     }
+  }
+
+  private getAdaptiveInterpolationDelayMs(): number {
+    const dynamicDelay =
+      this.remoteFrameIntervalAvgMs + this.remoteFrameJitterAvgMs * this.remoteJitterMultiplier
+    return Math.min(
+      this.remoteInterpolationMaxMs,
+      Math.max(this.remoteInterpolationMinMs, dynamicDelay)
+    )
   }
 
   private handleResize = () => {

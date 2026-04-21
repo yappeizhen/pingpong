@@ -13,23 +13,63 @@ import type { PaddleState, BallState, Player } from '@/types/game'
 export type MessageHandler = (message: GameSyncMessage) => void
 
 export class GameSyncService {
-  private dataChannel: RTCDataChannel | null = null
+  private transientChannel: RTCDataChannel | null = null
+  private reliableChannel: RTCDataChannel | null = null
   private messageHandlers: Set<MessageHandler> = new Set()
   private isHost: boolean = false
   private ballSequence = 0
   private readonly transientBackpressureLimit = 128 * 1024
 
   setDataChannel(channel: RTCDataChannel, isHost: boolean) {
-    this.dataChannel = channel
+    this.setDataChannels({ transient: channel }, isHost)
+  }
+
+  setDataChannels(
+    channels: { transient?: RTCDataChannel; reliable?: RTCDataChannel },
+    isHost: boolean
+  ) {
     this.isHost = isHost
     this.ballSequence = 0
 
+    if (channels.transient) {
+      this.transientChannel = channels.transient
+      this.bindChannel(this.transientChannel, 'transient')
+    }
+    if (channels.reliable) {
+      this.reliableChannel = channels.reliable
+      this.bindChannel(this.reliableChannel, 'reliable')
+    }
+  }
+
+  attachDataChannel(channel: RTCDataChannel, isHost: boolean) {
+    this.isHost = isHost
+
+    const isReliableChannel = channel.label === 'gameSyncReliable'
+    if (isReliableChannel) {
+      this.reliableChannel = channel
+      this.bindChannel(channel, 'reliable')
+    } else {
+      this.transientChannel = channel
+      this.bindChannel(channel, 'transient')
+    }
+  }
+
+  private bindChannel(channel: RTCDataChannel, channelType: 'transient' | 'reliable') {
     channel.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data) as GameSyncMessage
         this.messageHandlers.forEach((handler) => handler(message))
       } catch {
         // Ignore parse errors
+      }
+    }
+
+    channel.onclose = () => {
+      if (channelType === 'transient' && this.transientChannel === channel) {
+        this.transientChannel = null
+      }
+      if (channelType === 'reliable' && this.reliableChannel === channel) {
+        this.reliableChannel = null
       }
     }
   }
@@ -43,20 +83,36 @@ export class GameSyncService {
     return message.type === 'ball' || message.type === 'paddle'
   }
 
+  private getOpenChannel(channel: RTCDataChannel | null): RTCDataChannel | null {
+    return channel?.readyState === 'open' ? channel : null
+  }
+
+  private selectChannel(message: GameSyncMessage): RTCDataChannel | null {
+    const transient = this.getOpenChannel(this.transientChannel)
+    const reliable = this.getOpenChannel(this.reliableChannel)
+
+    if (this.isTransientMessage(message)) {
+      return transient ?? reliable
+    }
+    return reliable ?? transient
+  }
+
   private send(message: GameSyncMessage) {
-    if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+    const channel = this.selectChannel(message)
+    if (!channel) {
       return
     }
 
     if (
       this.isTransientMessage(message) &&
-      this.dataChannel.bufferedAmount > this.transientBackpressureLimit
+      channel === this.transientChannel &&
+      channel.bufferedAmount > this.transientBackpressureLimit
     ) {
       return
     }
 
     try {
-      this.dataChannel.send(JSON.stringify(message))
+      channel.send(JSON.stringify(message))
     } catch {
       // Ignore send errors
     }
@@ -134,14 +190,15 @@ export class GameSyncService {
   }
 
   isConnected(): boolean {
-    return this.dataChannel?.readyState === 'open'
+    return this.getOpenChannel(this.transientChannel) !== null ||
+      this.getOpenChannel(this.reliableChannel) !== null
   }
 
   close() {
-    if (this.dataChannel) {
-      this.dataChannel.close()
-      this.dataChannel = null
-    }
+    this.transientChannel?.close()
+    this.reliableChannel?.close()
+    this.transientChannel = null
+    this.reliableChannel = null
     this.messageHandlers.clear()
   }
 }

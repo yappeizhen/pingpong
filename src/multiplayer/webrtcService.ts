@@ -130,6 +130,8 @@ export async function createPeerConnection(
   const unsubscribes: Unsubscribe[] = []
   let remoteStream: MediaStream | null = null
   let dataChannel: RTCDataChannel | null = null
+  let transientDataChannel: RTCDataChannel | null = null
+  let reliableDataChannel: RTCDataChannel | null = null
 
   const pendingIceCandidates: RTCIceCandidateInit[] = []
   let remoteDescriptionSet = false
@@ -361,16 +363,36 @@ export async function createPeerConnection(
   unsubscribes.push(() => clearInterval(pollInterval))
 
   try {
+    const wireDataChannel = (channel: RTCDataChannel) => {
+      if (channel.label === 'gameSyncReliable') {
+        reliableDataChannel = channel
+      } else {
+        transientDataChannel = channel
+        dataChannel = channel
+      }
+
+      channel.onopen = () => {
+        console.log('[WebRTC] Data channel open:', channel.label)
+        onDataChannel(channel)
+      }
+
+      if (channel.readyState === 'open') {
+        onDataChannel(channel)
+      }
+    }
+
     if (isHost) {
-      dataChannel = pc.createDataChannel('gameSync', {
+      transientDataChannel = pc.createDataChannel('gameSyncTransient', {
         ordered: false,
         maxRetransmits: 0,
       })
+      reliableDataChannel = pc.createDataChannel('gameSyncReliable', {
+        ordered: true,
+      })
+      dataChannel = transientDataChannel
 
-      dataChannel.onopen = () => {
-        console.log('[WebRTC] Data channel open (host)')
-        onDataChannel(dataChannel!)
-      }
+      wireDataChannel(transientDataChannel)
+      wireDataChannel(reliableDataChannel)
 
       console.log('[WebRTC] Host creating offer...')
       const offer = await pc.createOffer()
@@ -407,12 +429,11 @@ export async function createPeerConnection(
       unsubscribes.push(unsubAnswer)
     } else {
       pc.ondatachannel = (event) => {
-        dataChannel = event.channel
-
-        dataChannel.onopen = () => {
-          console.log('[WebRTC] Data channel open (guest)')
-          onDataChannel(dataChannel!)
+        const incomingChannel = event.channel
+        if (incomingChannel.label !== 'gameSyncReliable') {
+          dataChannel = incomingChannel
         }
+        wireDataChannel(incomingChannel)
       }
 
       console.log('[WebRTC] Guest waiting for offer...')
@@ -465,6 +486,10 @@ export async function createPeerConnection(
   return {
     peerConnection: pc,
     dataChannel,
+    dataChannels: {
+      transient: transientDataChannel,
+      reliable: reliableDataChannel,
+    },
     localStream,
     remoteStream,
     unsubscribes,
@@ -483,6 +508,8 @@ export async function closePeerConnection(
   if (connection.dataChannel) {
     connection.dataChannel.close()
   }
+  connection.dataChannels?.transient?.close()
+  connection.dataChannels?.reliable?.close()
 
   connection.peerConnection.close()
 

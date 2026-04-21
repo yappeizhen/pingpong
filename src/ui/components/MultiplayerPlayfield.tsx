@@ -24,6 +24,7 @@ const REMOTE_PADDLE_BASE_COMP_MS = 70
 const REMOTE_PADDLE_MIN_COMP_MS = 16
 const REMOTE_PADDLE_MAX_COMP_MS = 140
 const REMOTE_PADDLE_MAX_LEAD = 0.18
+const HOST_BALL_SYNC_INTERVAL_MS = 16
 
 export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -117,9 +118,9 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
   // Handle data channel from WebRTC
   const handleDataChannel = useCallback((channel: RTCDataChannel) => {
-    console.log('[MultiplayerPlayfield] Data channel ready')
+    console.log('[MultiplayerPlayfield] Data channel ready:', channel.label)
     setDataChannel(channel)
-    gameSyncService.setDataChannel(channel, isHost)
+    gameSyncService.attachDataChannel(channel, isHost)
   }, [setDataChannel, isHost])
 
   // WebRTC hook - enable when we have a local stream
@@ -240,10 +241,18 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
       // Host is player1, Guest is player2
       if (isHost) {
         gameRef.current.setPlayer1Paddle(paddleState)
+        gameSyncService.sendPaddle(playerId, paddleState)
       } else {
+        // Guest uses paddle locally as-is (their view is flipped)
         gameRef.current.setPlayer2Paddle(paddleState)
+        // But send with flipped X to host (so physics coordinates match)
+        const flippedPaddleState = {
+          ...paddleState,
+          position: { x: 1 - paddleState.position.x, y: paddleState.position.y },
+          velocity: { x: -paddleState.velocity.x, y: paddleState.velocity.y },
+        }
+        gameSyncService.sendPaddle(playerId, flippedPaddleState)
       }
-      gameSyncService.sendPaddle(playerId, paddleState)
     },
     [playerId, isHost]
   )
@@ -293,7 +302,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
             gameSyncService.sendBall(ballState)
           }
         }
-      }, 50) // 20 times per second
+      }, HOST_BALL_SYNC_INTERVAL_MS)
     }
 
     return () => {
@@ -339,7 +348,13 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
                 compensateRemotePaddleLatency(paddleData, message.timestamp)
               )
             } else {
-              gameRef.current.setPlayer1Paddle(paddleData)
+              // Guest flips host's paddle X for their flipped camera view
+              const flippedPaddleData = {
+                ...paddleData,
+                position: { x: 1 - paddleData.position.x, y: paddleData.position.y },
+                velocity: { x: -paddleData.velocity.x, y: paddleData.velocity.y },
+              }
+              gameRef.current.setPlayer1Paddle(flippedPaddleData)
             }
           }
           break

@@ -120,6 +120,10 @@ export type GameSyncMessage =
 export interface WebRTCConnection {
   peerConnection: RTCPeerConnection
   dataChannel: RTCDataChannel | null
+  dataChannels?: {
+    transient: RTCDataChannel | null
+    reliable: RTCDataChannel | null
+  }
   localStream: MediaStream | null
   remoteStream: MediaStream | null
   unsubscribes: Array<() => void>
