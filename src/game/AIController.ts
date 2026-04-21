@@ -2,13 +2,18 @@ import { TABLE, PHYSICS, BALL } from './constants'
 import type { BallState, PaddleState } from '@/types'
 
 const AI_CONFIG = {
-  reactionDelay: 24,
-  speed: 0.18,
-  predictionError: 0.016,
-  anticipation: 0.82,
-  aggression: 0.68,
-  trackingAccuracy: 0.9,
+  reactionDelay: 16,
+  speed: 0.21,
+  predictionError: 0.01,
+  anticipation: 0.9,
+  aggression: 0.72,
+  trackingAccuracy: 0.92,
+  maxReturnAim: 0.12,
 } as const
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
 
 export class AIController {
   private targetX: number = 0.5
@@ -34,7 +39,8 @@ export class AIController {
 
     if (ballState.isInPlay && ballState.velocity.z > 0 && this.lastBallZ <= 0) {
       this.rallyCount++
-      this.returnAimX = (Math.random() - 0.5) * AI_CONFIG.aggression * 1.5
+      const randomAim = (Math.random() - 0.5) * AI_CONFIG.aggression * 0.95
+      this.returnAimX = clamp(randomAim, -AI_CONFIG.maxReturnAim, AI_CONFIG.maxReturnAim)
     }
     this.lastBallZ = ballState.velocity.z
 
@@ -53,7 +59,7 @@ export class AIController {
     const ballSpeed = Math.sqrt(
       ballState.velocity.x ** 2 + ballState.velocity.y ** 2 + ballState.velocity.z ** 2
     )
-    this.currentPaddle.swipeSpeed = 0.5 + AI_CONFIG.aggression * 0.5 + Math.min(ballSpeed * 0.06, 0.4)
+    this.currentPaddle.swipeSpeed = 0.58 + AI_CONFIG.aggression * 0.52 + Math.min(ballSpeed * 0.06, 0.45)
 
     return { ...this.currentPaddle }
   }
@@ -87,15 +93,15 @@ export class AIController {
       const timeToIntercept = distanceToIntercept / Math.max(Math.abs(ball.velocity.z), 0.5)
       
       if (timeToIntercept < 0.3) {
-        this.targetDepth = Math.max(-0.2, Math.min(0.5, prediction.depth + 0.1))
+        this.targetDepth = Math.max(-0.2, Math.min(0.35, prediction.depth + 0.02))
       } else {
-        this.targetDepth = 0.05
+        this.targetDepth = 0
       }
     } else {
       const anticipatedX = this.anticipateReturnPosition(ball)
       this.targetX = 0.5 + (anticipatedX - 0.5) * AI_CONFIG.anticipation
       this.targetY = 0.4
-      this.targetDepth = 0.1
+      this.targetDepth = 0.03
     }
   }
 
@@ -206,7 +212,7 @@ export class AIController {
       
       let urgency = 1.0
       if (ballApproaching) {
-        urgency = 1.0 + Math.min(2.0, (0.8 / Math.max(ballDistance, 0.2)) + ballSpeed * 0.15)
+        urgency = 1.0 + Math.min(1.85, (0.75 / Math.max(ballDistance, 0.22)) + ballSpeed * 0.13)
       }
       
       const adjustedSpeed = baseSpeed * urgency
@@ -223,9 +229,20 @@ export class AIController {
     }
 
     this.currentPaddle.velocity = {
-      x: this.returnAimX * AI_CONFIG.aggression,
+      x: clamp(this.returnAimX * AI_CONFIG.aggression, -0.12, 0.12),
       y: 0,
     }
+
+    // Keep AI returns table-friendly after the richer spin/angle model.
+    this.currentPaddle.faceTilt = {
+      x: 0.05,
+      y: this.currentPaddle.velocity.x * 0.8,
+    }
+    this.currentPaddle.brush = {
+      x: this.currentPaddle.velocity.x * 0.5,
+      y: 0.08,
+    }
+    this.currentPaddle.swingEnergy = 0.62
 
     this.currentPaddle.isActive = true
     this.currentPaddle.isSwinging = true

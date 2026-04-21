@@ -40,6 +40,9 @@ export interface PaddleState {
   isSwinging: boolean
   swipeSpeed: number
   hand: Handedness | null
+  faceTilt?: Vector2
+  brush?: Vector2
+  swingEnergy?: number
 }
 
 export interface PlayerState {

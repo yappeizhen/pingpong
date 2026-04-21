@@ -15,10 +15,14 @@ export class SwipeDetector {
   private positionHistory: Array<{ x: number; y: number; time: number }> = []
   private lastVelocity = { x: 0, y: 0 }
 
-  update(palm: PalmPosition | null): SwipeState {
+  update(
+    palm: PalmPosition | null,
+    options: { requireOpenPalm?: boolean } = {}
+  ): SwipeState {
     const now = performance.now()
+    const requireOpenPalm = options.requireOpenPalm ?? true
 
-    if (!palm || !palm.isOpen) {
+    if (!palm || (requireOpenPalm && !palm.isOpen)) {
       this.positionHistory = []
       this.lastVelocity = { x: 0, y: 0 }
       return {

@@ -39,14 +39,14 @@ export class BallPhysics {
       : -this.tableHalfLength * 0.85  // Near back of AI's side
     
     // Serve speed - needs enough forward momentum to reach deep into opponent's side
-    const serveSpeed = BALL.INITIAL_SPEED + 0.8 + seededRandom() * 0.4
+    const serveSpeed = BALL.INITIAL_SPEED + 1.05 + seededRandom() * 0.55
     
     const velocityZ = player === 'player1'
       ? -serveSpeed  // Towards AI (negative z)
       : serveSpeed   // Towards player1 (positive z)
 
     // Higher arc for better serve - gives time to travel and bounce properly
-    const upwardVelocity = 2.5 + seededRandom() * 0.5
+    const upwardVelocity = 2.2 + seededRandom() * 0.45
 
     this.state = {
       position: {
@@ -184,61 +184,82 @@ export class BallPhysics {
     const dz = this.state.position.z - paddleZ
 
     const distanceXY = Math.sqrt(dx * dx + dy * dy)
-    // Both players get same hit zone in multiplayer
     const hitZone = PADDLE.HIT_ZONE * 1.2
-    // Increased depth tolerance for network latency
-    const depthTolerance = 0.3
+    const depthTolerance = 0.32
 
     const approachingPaddle =
       (player === 'player1' && this.state.velocity.z > 0) ||
       (player === 'player2' && this.state.velocity.z < 0)
 
+    const hasBouncedOnReceiverSide = player === 'player1'
+      ? this.bouncedOnPlayerSide.player1
+      : this.bouncedOnPlayerSide.player2
+
     // Both players can hit when paddle is active (swinging or recently active)
     const canHit = paddle.isActive || paddle.isSwinging
 
-    if (distanceXY < hitZone && Math.abs(dz) < depthTolerance && approachingPaddle && canHit) {
+    if (
+      distanceXY < hitZone &&
+      Math.abs(dz) < depthTolerance &&
+      approachingPaddle &&
+      canHit &&
+      hasBouncedOnReceiverSide
+    ) {
       const direction = player === 'player1' ? -1 : 1
       const incomingSpeed = Math.sqrt(
         this.state.velocity.x ** 2 +
           this.state.velocity.y ** 2 +
           this.state.velocity.z ** 2
       )
+      const faceTilt = paddle.faceTilt ?? { x: 0, y: 0 }
+      const brush = paddle.brush ?? { x: 0, y: 0 }
+      const swingEnergy = Math.max(0, Math.min(1, paddle.swingEnergy ?? paddle.swipeSpeed))
       
       // Swipe speed adds extra power on top of baseline
-      const swingBoost = player === 'player1' 
-        ? Math.min(paddle.swipeSpeed * 12, 1.5)  // Moderate swing influence
-        : Math.min(paddle.swipeSpeed * 6, 1.2)
+      const swingBoost = Math.min(paddle.swipeSpeed * (player === 'player1' ? 7.5 : 6.8), 1.1)
       
       // Baseline speed - consistent with original
       const baseSpeed = Math.max(incomingSpeed * 0.85, 2.4)
-      const newSpeed = Math.min(baseSpeed + 0.6 + swingBoost, BALL.MAX_SPEED)
+      const rawSpeed = Math.min(
+        baseSpeed + 0.5 + swingBoost + swingEnergy * 0.45,
+        BALL.MAX_SPEED
+      )
+      const newSpeed = rawSpeed
 
       // Where ball hit on paddle (-1 to 1, left to right)
       const offsetX = dx / hitZone
       const offsetY = dy / hitZone
       
-      // Paddle swing direction influences angle
-      const aimX = paddle.velocity.x * (player === 'player1' ? 0.4 : 0.5)
+      // Paddle swing direction influences angle.
+      // Apply deadzone/clamp for player1 so hand jitter does not over-steer shots.
+      const rawAimX = paddle.velocity.x * (player === 'player1' ? 0.4 : 0.5)
+      const aimX = player === 'player1'
+        ? Math.max(-0.12, Math.min(0.12, Math.abs(rawAimX) < 0.02 ? 0 : rawAimX))
+        : rawAimX
       
       let xVelocity: number
       if (player === 'player1') {
-        // Player angle: combination of swing direction and paddle offset
-        // Swing direction has moderate influence, offset adds natural angle
-        xVelocity = (offsetX * 0.4 + aimX * 0.6) * newSpeed
+        xVelocity = (offsetX * 0.3 + aimX * 0.32 + brush.x * 0.08 + faceTilt.y * 0.1) * newSpeed
       } else {
-        // AI aims with intention
-        xVelocity = (aimX + offsetX * 0.2) * newSpeed * 0.8
+        xVelocity = (aimX * 0.78 + offsetX * 0.26 + faceTilt.y * 0.1 + brush.x * 0.07) * newSpeed
       }
 
       this.state.velocity = {
         x: xVelocity,
-        y: 1.6 + Math.abs(offsetY) * newSpeed * 0.12 + swingBoost * 0.15,
-        z: direction * newSpeed * 0.92,
+        y:
+          1.45 +
+          Math.abs(offsetY) * newSpeed * 0.1 +
+          swingBoost * 0.12 +
+          faceTilt.x * 0.5 +
+          brush.y * 0.14,
+        z: direction * newSpeed * (0.95 + swingEnergy * 0.08),
       }
 
+      const spinX = offsetX * 0.7 + aimX * 0.9 + brush.x * 0.7 + faceTilt.y * 0.5
+      const spinY = offsetY * 0.8 + brush.y * 0.9 + faceTilt.x * 0.6
       this.state.spin = {
-        x: (offsetX + aimX * 2) * 1.2,
-        y: offsetY * 1.2,
+        x: Math.max(-2.6, Math.min(2.6, spinX)),
+        y: Math.max(-2.6, Math.min(2.6, spinY)),
       }
 
       this.state.lastHitBy = player

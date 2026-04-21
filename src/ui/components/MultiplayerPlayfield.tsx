@@ -97,6 +97,9 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         isActive: boolean
         isSwinging: boolean
         swipeSpeed: number
+        faceTilt?: { x: number; y: number }
+        brush?: { x: number; y: number }
+        swingEnergy?: number
         hand: HandControllerState['hand']
       },
       messageTimestamp: number
@@ -243,6 +246,9 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         isActive: state.isActive,
         isSwinging: state.isSwinging,
         swipeSpeed: state.swipeSpeed,
+        faceTilt: state.faceTilt,
+        brush: state.brush,
+        swingEnergy: state.swingEnergy,
         hand: state.hand,
       }
 
@@ -258,6 +264,12 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
           ...paddleState,
           position: { x: 1 - paddleState.position.x, y: paddleState.position.y },
           velocity: { x: -paddleState.velocity.x, y: paddleState.velocity.y },
+          faceTilt: paddleState.faceTilt
+            ? { x: paddleState.faceTilt.x, y: -paddleState.faceTilt.y }
+            : undefined,
+          brush: paddleState.brush
+            ? { x: -paddleState.brush.x, y: paddleState.brush.y }
+            : undefined,
         }
         gameSyncService.sendPaddle(playerId, flippedPaddleState)
       }
@@ -348,6 +360,9 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
               isActive: message.paddle.isActive,
               isSwinging: message.paddle.isSwinging,
               swipeSpeed: message.paddle.swipeSpeed,
+              faceTilt: message.paddle.faceTilt,
+              brush: message.paddle.brush,
+              swingEnergy: message.paddle.swingEnergy,
               hand: message.paddle.hand,
             }
             if (isHost) {
@@ -361,6 +376,12 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
                 ...paddleData,
                 position: { x: 1 - paddleData.position.x, y: paddleData.position.y },
                 velocity: { x: -paddleData.velocity.x, y: paddleData.velocity.y },
+                faceTilt: paddleData.faceTilt
+                  ? { x: paddleData.faceTilt.x, y: -paddleData.faceTilt.y }
+                  : undefined,
+                brush: paddleData.brush
+                  ? { x: -paddleData.brush.x, y: paddleData.brush.y }
+                  : undefined,
               }
               gameRef.current.setPlayer1Paddle(flippedPaddleData)
             }

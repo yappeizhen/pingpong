@@ -14,10 +14,10 @@ export const BALL = {
   RADIUS: 0.02,
   MASS: 0.0027,
   COLOR: 0xfaebd7,        // Antique white/cream - warmer ping pong ball color
-  INITIAL_SPEED: 2.2,
-  MAX_SPEED: 6.0,
-  BOUNCE_COEFFICIENT: 0.9,
-  SPIN_FACTOR: 0.2,
+  INITIAL_SPEED: 2.45,
+  MAX_SPEED: 6.2,
+  BOUNCE_COEFFICIENT: 0.89,
+  SPIN_FACTOR: 0.16,
 } as const
 
 export const PADDLE = {
@@ -31,10 +31,10 @@ export const PADDLE = {
 } as const
 
 export const PHYSICS = {
-  GRAVITY: -6.0,
+  GRAVITY: -7.2,
   AIR_RESISTANCE: 0.995,
   TIME_STEP: 1 / 120,
-  TABLE_FRICTION: 0.8,
+  TABLE_FRICTION: 0.86,
 } as const
 
 export const CAMERA = {

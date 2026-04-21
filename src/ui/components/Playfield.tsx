@@ -47,6 +47,9 @@ export function Playfield() {
         isActive: state.isActive,
         isSwinging: state.isSwinging,
         swipeSpeed: state.swipeSpeed,
+        faceTilt: state.faceTilt,
+        brush: state.brush,
+        swingEnergy: state.swingEnergy,
         hand: state.hand,
       })
     },
