@@ -35,9 +35,8 @@ export class PongGame {
   private isGuestMode = false
   private remoteBallState: BallState | null = null
   private remoteBallFrames: RemoteBallFrame[] = []
-  // Keep a short interpolation buffer for smoother guest playback without adding too much latency.
-  private readonly remoteInterpolationDelayMs = 35
-  private readonly remoteMaxExtrapolationMs = 120
+  private readonly remoteInterpolationDelayMs = 50
+  private readonly remoteMaxExtrapolationMs = 90
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
