@@ -40,10 +40,7 @@ export class PongGame {
   private readonly remoteInterpolationMinMs = 18
   private readonly remoteInterpolationMaxMs = 110
   private readonly remoteJitterMultiplier = 2
-  private readonly remoteExtrapolationMinMs = 45
-  private readonly remoteExtrapolationMaxMs = 170
-  private readonly remoteSoftSnapDistance = 0.24
-  private readonly remoteHardSnapDistance = 0.46
+  private readonly remoteMaxExtrapolationMs = 90
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -354,14 +351,6 @@ export class PongGame {
       this.remoteBallFrames.splice(0, this.remoteBallFrames.length - 24)
     }
 
-    const driftFromRendered = this.distanceToRenderedBall(copiedState)
-    if (driftFromRendered >= this.remoteHardSnapDistance) {
-      this.remoteBallFrames = [{ state: copiedState, receivedAt }]
-    } else if (driftFromRendered >= this.remoteSoftSnapDistance && this.remoteBallFrames.length > 3) {
-      // Keep only the latest two frames so correction converges faster after burst loss.
-      this.remoteBallFrames = this.remoteBallFrames.slice(-2)
-    }
-
     this.physics.setState(copiedState)
   }
 
@@ -520,7 +509,7 @@ export class PongGame {
 
     const dtSeconds = Math.min(
       (renderTime - latest.receivedAt) / 1000,
-      this.getAdaptiveExtrapolationMaxMs() / 1000
+      this.remoteMaxExtrapolationMs / 1000
     )
 
     if (!latest.state.isInPlay || dtSeconds <= 0) {
@@ -544,21 +533,6 @@ export class PongGame {
       this.remoteInterpolationMaxMs,
       Math.max(this.remoteInterpolationMinMs, dynamicDelay)
     )
-  }
-
-  private getAdaptiveExtrapolationMaxMs(): number {
-    const dynamicMax = this.remoteFrameIntervalAvgMs * 2.5 + this.remoteFrameJitterAvgMs * 4
-    return Math.min(
-      this.remoteExtrapolationMaxMs,
-      Math.max(this.remoteExtrapolationMinMs, dynamicMax)
-    )
-  }
-
-  private distanceToRenderedBall(state: BallState): number {
-    const dx = this.ball.position.x - state.position.x
-    const dy = this.ball.position.y - state.position.y
-    const dz = this.ball.position.z - state.position.z
-    return Math.sqrt(dx * dx + dy * dy + dz * dz)
   }
 
   private handleResize = () => {

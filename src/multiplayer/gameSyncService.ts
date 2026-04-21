@@ -4,6 +4,7 @@ import type {
   BallSyncMessage,
   ServeSyncMessage,
   ServeRequestSyncMessage,
+  PlayAgainRequestSyncMessage,
   PointSyncMessage,
   GameStartSyncMessage,
   GameEndSyncMessage,
@@ -258,6 +259,14 @@ export class GameSyncService {
   sendServeRequest() {
     const message: ServeRequestSyncMessage = {
       type: 'serve-request',
+      timestamp: Date.now(),
+    }
+    this.send(message)
+  }
+
+  sendPlayAgainRequest() {
+    const message: PlayAgainRequestSyncMessage = {
+      type: 'play-again-request',
       timestamp: Date.now(),
     }
     this.send(message)

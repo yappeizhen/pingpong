@@ -24,10 +24,7 @@ const REMOTE_PADDLE_BASE_COMP_MS = 70
 const REMOTE_PADDLE_MIN_COMP_MS = 16
 const REMOTE_PADDLE_MAX_COMP_MS = 140
 const REMOTE_PADDLE_MAX_LEAD = 0.18
-const REMOTE_BALL_MAX_AGE_MS = 600
 const HOST_BALL_SYNC_INTERVAL_MS = 16
-const HOST_BALL_SYNC_MIN_INTERVAL_MS = 16
-const HOST_BALL_SYNC_MAX_INTERVAL_MS = 33
 
 export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -80,6 +77,14 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     gameRef.current?.clearRemoteSync()
   }, [])
 
+  const startSynchronizedRematch = useCallback(() => {
+    resetGame()
+    resetGuestBallSync()
+    gameRef.current?.reset()
+    setServingPlayer('player1')
+    setShowCountdown(true)
+  }, [resetGame, resetGuestBallSync, setServingPlayer])
+
   const clamp01 = useCallback((value: number) => {
     return Math.min(1, Math.max(0, value))
   }, [])
@@ -96,7 +101,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
       },
       messageTimestamp: number
     ) => {
-      const apparentAgeMs = gameSyncService.getRemoteMessageAgeMs(messageTimestamp, Date.now())
+      const apparentAgeMs = Date.now() - messageTimestamp
       const compensationMs = Math.min(
         REMOTE_PADDLE_MAX_COMP_MS,
         Math.max(
@@ -296,57 +301,21 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     game.start()
 
     // Host sends ball state at regular intervals (not just on paddle movement)
-    let ballSyncTimer: ReturnType<typeof setTimeout> | null = null
-    let isDisposed = false
+    let ballSyncInterval: ReturnType<typeof setInterval> | null = null
     if (isHost) {
-      let syncIntervalMs = HOST_BALL_SYNC_INTERVAL_MS
-      let consecutiveSendFailures = 0
-
-      const scheduleNextSync = (delayMs: number) => {
-        if (isDisposed) return
-        ballSyncTimer = setTimeout(syncBallState, delayMs)
-      }
-
-      const syncBallState = () => {
-        if (isDisposed) return
-
-        let attemptedSend = false
-        let wasSent = false
-
+      ballSyncInterval = setInterval(() => {
         if (gameRef.current && gameSyncService.isConnected()) {
           const ballState = gameRef.current.getBallState()
           if (ballState.isInPlay) {
-            attemptedSend = true
-            wasSent = gameSyncService.sendBall(ballState)
+            gameSyncService.sendBall(ballState)
           }
         }
-
-        if (attemptedSend) {
-          if (wasSent) {
-            consecutiveSendFailures = 0
-            syncIntervalMs = Math.max(HOST_BALL_SYNC_MIN_INTERVAL_MS, syncIntervalMs - 2)
-          } else {
-            consecutiveSendFailures += 1
-            if (consecutiveSendFailures >= 2) {
-              syncIntervalMs = Math.min(HOST_BALL_SYNC_MAX_INTERVAL_MS, syncIntervalMs + 3)
-              consecutiveSendFailures = 0
-            }
-          }
-        } else {
-          consecutiveSendFailures = 0
-          syncIntervalMs = Math.max(HOST_BALL_SYNC_MIN_INTERVAL_MS, syncIntervalMs - 1)
-        }
-
-        scheduleNextSync(syncIntervalMs)
-      }
-
-      scheduleNextSync(syncIntervalMs)
+      }, HOST_BALL_SYNC_INTERVAL_MS)
     }
 
     return () => {
-      isDisposed = true
-      if (ballSyncTimer) {
-        clearTimeout(ballSyncTimer)
+      if (ballSyncInterval) {
+        clearInterval(ballSyncInterval)
       }
       game.dispose()
       gameRef.current = null
@@ -403,10 +372,6 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
             if (message.seq <= lastBallSeqRef.current) {
               break
             }
-            const messageAgeMs = gameSyncService.getRemoteMessageAgeMs(message.timestamp, Date.now())
-            if (messageAgeMs > REMOTE_BALL_MAX_AGE_MS) {
-              break
-            }
             lastBallSeqRef.current = message.seq
             gameRef.current.setRemoteBallState(message.ball, performance.now())
           }
@@ -438,6 +403,13 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
           }
           break
 
+        case 'play-again-request':
+          if (isHost) {
+            startSynchronizedRematch()
+            gameSyncService.sendGameStart(Date.now(), 'player1')
+          }
+          break
+
         case 'point':
           if (!isHost && message.score) {
             // Guest receives authoritative score from host
@@ -454,14 +426,10 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
           break
 
         case 'game-start':
-          // Sync serving player from host
+          startSynchronizedRematch()
           if (message.servingPlayer) {
             setServingPlayer(message.servingPlayer)
           }
-          if (!isHost) {
-            resetGuestBallSync()
-          }
-          setPhase('serving')
           break
 
         case 'game-end':
@@ -471,18 +439,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     })
 
     return unsubscribe
-  }, [isHost, playerId, scorePoint, setPhase, setServingPlayer, resetGuestBallSync, compensateRemotePaddleLatency])
-
-  useEffect(() => {
-    if (connectionState !== 'connected') {
-      gameSyncService.stopTimeSync()
-      return
-    }
-    gameSyncService.startTimeSync(2000)
-    return () => {
-      gameSyncService.stopTimeSync()
-    }
-  }, [connectionState])
+  }, [isHost, playerId, scorePoint, setPhase, setServingPlayer, resetGuestBallSync, compensateRemotePaddleLatency, startSynchronizedRematch, resetGame])
 
   // Show countdown when room state changes to countdown
   useEffect(() => {
@@ -578,9 +535,13 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   }, [leaveRoom, onExit])
 
   const handlePlayAgain = useCallback(() => {
-    resetGame()
-    setShowCountdown(true)
-  }, [resetGame])
+    if (isHost) {
+      startSynchronizedRematch()
+      gameSyncService.sendGameStart(Date.now(), 'player1')
+      return
+    }
+    gameSyncService.sendPlayAgainRequest()
+  }, [isHost, startSynchronizedRematch])
 
   const isYourPoint =
     (lastScorer === 'player1' && isHost) ||

@@ -41,6 +41,7 @@ export type SyncMessageType =
   | 'ball'
   | 'serve'
   | 'serve-request'
+  | 'play-again-request'
   | 'point'
   | 'ready'
   | 'countdown'
@@ -109,6 +110,11 @@ export interface ServeRequestSyncMessage {
   timestamp: number
 }
 
+export interface PlayAgainRequestSyncMessage {
+  type: 'play-again-request'
+  timestamp: number
+}
+
 export interface TimeSyncPingMessage {
   type: 'timesync-ping'
   pingId: string
@@ -130,6 +136,7 @@ export type GameSyncMessage =
   | BallSyncMessage
   | ServeSyncMessage
   | ServeRequestSyncMessage
+  | PlayAgainRequestSyncMessage
   | TimeSyncPingMessage
   | TimeSyncPongMessage
   | PointSyncMessage
