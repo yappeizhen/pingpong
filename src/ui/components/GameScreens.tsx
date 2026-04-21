@@ -72,7 +72,7 @@ export function StartScreen() {
             <li>🖐️ Open your palm to show your paddle</li>
             <li>✊ Close your fist to hide it</li>
             <li>👋 Move your hand to hit the ball</li>
-            <li>🎯 First to 11 points wins!</li>
+            <li>🎯 First to 7 points wins!</li>
           </ul>
         </div>
       </div>
