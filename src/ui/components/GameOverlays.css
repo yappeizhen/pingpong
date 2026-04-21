@@ -46,17 +46,17 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
+  background: transparent;
   z-index: 50;
   animation: fadeIn 0.3s ease-out;
 }
 
 .point-overlay--player1 {
-  background: linear-gradient(180deg, rgba(24, 18, 0, 0.78) 0%, rgba(0, 0, 0, 0.64) 100%);
+  background: transparent;
 }
 
 .point-overlay--player2 {
-  background: linear-gradient(180deg, rgba(42, 8, 8, 0.78) 0%, rgba(0, 0, 0, 0.64) 100%);
+  background: transparent;
 }
 
 .point-text {
