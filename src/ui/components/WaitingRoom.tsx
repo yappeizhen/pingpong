@@ -19,7 +19,8 @@ export function WaitingRoom({ onBack, isVideoConnected = false }: WaitingRoomPro
     updateRoomState,
   } = useMultiplayerRoom()
 
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle')
+  const [codeCopyStatus, setCodeCopyStatus] = useState<'idle' | 'copied'>('idle')
+  const [linkCopyStatus, setLinkCopyStatus] = useState<'idle' | 'copied'>('idle')
   const [countdown, setCountdown] = useState<number | null>(null)
   const countdownStartedRef = useRef(false)
 
@@ -63,8 +64,8 @@ export function WaitingRoom({ onBack, isVideoConnected = false }: WaitingRoomPro
     if (!roomCode) return
     try {
       await navigator.clipboard.writeText(roomCode)
-      setCopyStatus('copied')
-      setTimeout(() => setCopyStatus('idle'), 2000)
+      setCodeCopyStatus('copied')
+      setTimeout(() => setCodeCopyStatus('idle'), 2000)
     } catch {
       window.prompt('Share this code with a friend:', roomCode)
     }
@@ -72,11 +73,13 @@ export function WaitingRoom({ onBack, isVideoConnected = false }: WaitingRoomPro
 
   const handleCopyLink = useCallback(async () => {
     if (!roomCode) return
-    const link = `${window.location.origin}?join=${roomCode}`
+    const url = new URL(window.location.href)
+    url.searchParams.set('join', roomCode)
+    const link = url.toString()
     try {
       await navigator.clipboard.writeText(link)
-      setCopyStatus('copied')
-      setTimeout(() => setCopyStatus('idle'), 2000)
+      setLinkCopyStatus('copied')
+      setTimeout(() => setLinkCopyStatus('idle'), 2000)
     } catch {
       window.prompt('Share this link with a friend:', link)
     }
@@ -112,16 +115,16 @@ export function WaitingRoom({ onBack, isVideoConnected = false }: WaitingRoomPro
             <button
               className="copy-btn"
               onClick={handleCopyCode}
-              title={copyStatus === 'copied' ? 'Copied!' : 'Copy code'}
+              title={codeCopyStatus === 'copied' ? 'Copied!' : 'Copy code'}
             >
-              {copyStatus === 'copied' ? '✓' : '📋'}
+              {codeCopyStatus === 'copied' ? '✓' : '📋'}
             </button>
             <button
               className="copy-btn"
               onClick={handleCopyLink}
-              title="Copy invite link"
+              title={linkCopyStatus === 'copied' ? 'Link copied!' : 'Copy invite link'}
             >
-              🔗
+              {linkCopyStatus === 'copied' ? '✓' : '🔗'}
             </button>
           </div>
           <span className="room-code-hint">Share the code with a friend!</span>

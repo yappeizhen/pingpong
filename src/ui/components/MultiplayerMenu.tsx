@@ -1,25 +1,32 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useMultiplayerRoom } from '@/multiplayer'
 import { getPlayerName, setPlayerName } from '@/multiplayer/multiplayerService'
 import './MultiplayerMenu.css'
 
 interface MultiplayerMenuProps {
   onBack: () => void
+  initialJoinCode?: string | null
 }
 
 type MenuView = 'menu' | 'create' | 'join'
 
-export function MultiplayerMenu({ onBack }: MultiplayerMenuProps) {
+export function MultiplayerMenu({ onBack, initialJoinCode = null }: MultiplayerMenuProps) {
   const {
     createRoom,
     joinRoom,
   } = useMultiplayerRoom()
 
-  const [view, setView] = useState<MenuView>('menu')
-  const [joinCode, setJoinCode] = useState('')
+  const [view, setView] = useState<MenuView>(initialJoinCode ? 'join' : 'menu')
+  const [joinCode, setJoinCode] = useState(initialJoinCode ?? '')
   const [playerName, setPlayerNameState] = useState(getPlayerName())
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!initialJoinCode) return
+    setView('join')
+    setJoinCode(initialJoinCode)
+  }, [initialJoinCode])
 
   const handleCreateRoom = useCallback(async () => {
     if (!playerName.trim()) {
