@@ -14,7 +14,9 @@ export function GameHUD({ isMultiplayer = false, isHost = true, hideMenuButton =
   // In multiplayer, determine if it's "your turn" based on whether you're the serving player
   // Host is player1, Guest is player2
   const myPlayer = isMultiplayer ? (isHost ? 'player1' : 'player2') : 'player1'
+  const opponentPlayer = myPlayer === 'player1' ? 'player2' : 'player1'
   const isMyServe = servingPlayer === myPlayer
+  const isOpponentServe = servingPlayer === opponentPlayer
 
   // Determine display names and scores based on perspective
   const youName = 'You'
@@ -32,7 +34,7 @@ export function GameHUD({ isMultiplayer = false, isHost = true, hideMenuButton =
         </button>
       )}
       <div className="hud-scores">
-        <div className={`hud-player ${isMyServe ? 'serving' : ''}`}>
+        <div className={`hud-player hud-player--left ${myPlayer} ${isMyServe ? 'serving' : ''}`}>
           <span className="player-name">{youName || 'You'}</span>
           <span className="player-score">{youScore}</span>
           {isMyServe && <span className="serve-indicator">●</span>}
@@ -40,10 +42,10 @@ export function GameHUD({ isMultiplayer = false, isHost = true, hideMenuButton =
 
         <div className="hud-divider">-</div>
 
-        <div className={`hud-player opponent ${!isMyServe && servingPlayer ? 'serving' : ''}`}>
+        <div className={`hud-player hud-player--right ${opponentPlayer} ${isOpponentServe ? 'serving' : ''}`}>
           <span className="player-name">{opponentName || 'Opponent'}</span>
           <span className="player-score">{opponentScore}</span>
-          {!isMyServe && servingPlayer && <span className="serve-indicator">●</span>}
+          {isOpponentServe && <span className="serve-indicator">●</span>}
         </div>
       </div>
 

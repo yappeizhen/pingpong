@@ -148,7 +148,9 @@ export function Playfield() {
       <DebugPanel />
 
       {phase === 'countdown' && <CountdownOverlay onComplete={handleCountdownComplete} />}
-      {phase === 'point-scored' && <PointScoredOverlay scorerName={scorerName} />}
+      {phase === 'point-scored' && (
+        <PointScoredOverlay scorerName={scorerName} scorerPlayer={lastScorer ?? 'player1'} />
+      )}
       {phase === 'game-over' && (
         <GameOverOverlay
           score={{ player1: player1.score, player2: player2.score }}

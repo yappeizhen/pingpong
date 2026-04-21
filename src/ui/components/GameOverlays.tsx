@@ -29,13 +29,18 @@ export function CountdownOverlay({ startFrom = 3, onComplete }: CountdownOverlay
 interface PointScoredOverlayProps {
   scorerName: string
   title?: string
+  scorerPlayer?: 'player1' | 'player2'
 }
 
-export function PointScoredOverlay({ scorerName, title = 'Point!' }: PointScoredOverlayProps) {
+export function PointScoredOverlay({
+  scorerName,
+  title = 'Point!',
+  scorerPlayer = 'player1',
+}: PointScoredOverlayProps) {
   return (
-    <div className="point-overlay">
+    <div className={`point-overlay point-overlay--${scorerPlayer}`}>
       <span className="point-text">{title}</span>
-      <span className="point-scorer">{scorerName}</span>
+      <span className={`point-scorer point-scorer--${scorerPlayer}`}>{scorerName}</span>
     </div>
   )
 }

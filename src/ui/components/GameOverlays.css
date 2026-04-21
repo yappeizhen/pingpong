@@ -51,6 +51,14 @@
   animation: fadeIn 0.3s ease-out;
 }
 
+.point-overlay--player1 {
+  background: linear-gradient(180deg, rgba(24, 18, 0, 0.78) 0%, rgba(0, 0, 0, 0.64) 100%);
+}
+
+.point-overlay--player2 {
+  background: linear-gradient(180deg, rgba(42, 8, 8, 0.78) 0%, rgba(0, 0, 0, 0.64) 100%);
+}
+
 .point-text {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 4rem;
@@ -62,8 +70,17 @@
 .point-scorer {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 1.5rem;
-  color: #4ade80;
   margin-top: 0.5rem;
+}
+
+.point-scorer--player1 {
+  color: #ffdd00;
+  text-shadow: 0 0 20px rgba(255, 221, 0, 0.45);
+}
+
+.point-scorer--player2 {
+  color: #f44336;
+  text-shadow: 0 0 20px rgba(244, 67, 54, 0.45);
 }
 
 .gameover-overlay {

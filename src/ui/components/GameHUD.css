@@ -62,48 +62,52 @@
   transition: background 0.2s ease;
 }
 
-/* Player 1 (You) - Yellow theme */
-.hud-player:not(.opponent) {
+/* Keep the right side visually mirrored regardless of player identity. */
+.hud-player--right {
+  flex-direction: row-reverse;
+}
+
+/* Player 1 (host) - Yellow theme */
+.hud-player.player1 {
   background: rgba(255, 221, 0, 0.12);
   border-left: 3px solid #ffdd00;
 }
 
-.hud-player:not(.opponent) .player-name {
+.hud-player.player1 .player-name {
   color: #ffe066;
 }
 
-.hud-player:not(.opponent) .player-score {
+.hud-player.player1 .player-score {
   color: #ffdd00;
 }
 
-.hud-player:not(.opponent).serving {
+.hud-player.player1.serving {
   background: rgba(255, 221, 0, 0.22);
 }
 
-.hud-player:not(.opponent) .serve-indicator {
+.hud-player.player1 .serve-indicator {
   color: #ffdd00;
 }
 
-/* Player 2 (Opponent) - Red theme */
-.hud-player.opponent {
-  flex-direction: row-reverse;
+/* Player 2 (guest) - Red theme */
+.hud-player.player2 {
   background: rgba(244, 67, 54, 0.15);
-  border-right: 3px solid #f44336;
+  border-left: 3px solid #f44336;
 }
 
-.hud-player.opponent .player-name {
+.hud-player.player2 .player-name {
   color: #ef9a9a;
 }
 
-.hud-player.opponent .player-score {
+.hud-player.player2 .player-score {
   color: #f44336;
 }
 
-.hud-player.opponent.serving {
+.hud-player.player2.serving {
   background: rgba(244, 67, 54, 0.25);
 }
 
-.hud-player.opponent .serve-indicator {
+.hud-player.player2 .serve-indicator {
   color: #f44336;
 }
 

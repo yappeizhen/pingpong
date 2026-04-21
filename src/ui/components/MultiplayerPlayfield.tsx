@@ -582,7 +582,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
         )}
 
         {phase === 'point-scored' && (
-          <PointScoredOverlay scorerName={scorerName} />
+          <PointScoredOverlay scorerName={scorerName} scorerPlayer={lastScorer ?? 'player1'} />
         )}
 
         {phase === 'game-over' && (
