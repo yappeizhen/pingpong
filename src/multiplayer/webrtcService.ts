@@ -135,7 +135,26 @@ export async function createPeerConnection(
   let remoteDescriptionSet = false
 
   localStream.getTracks().forEach((track) => {
-    pc.addTrack(track, localStream)
+    const sender = pc.addTrack(track, localStream)
+
+    if (track.kind === 'video') {
+      // Favor realtime responsiveness over visual quality for multiplayer gameplay.
+      try {
+        const params = sender.getParameters()
+        const nextParams: RTCRtpSendParameters = { ...params }
+        if (!nextParams.encodings || nextParams.encodings.length === 0) {
+          nextParams.encodings = [{}]
+        }
+        nextParams.degradationPreference = 'maintain-framerate'
+        nextParams.encodings[0].maxBitrate = 1_200_000
+        nextParams.encodings[0].maxFramerate = 30
+        void sender.setParameters(nextParams).catch((error: unknown) => {
+          console.warn('[WebRTC] Unable to tune RTP sender parameters:', error)
+        })
+      } catch (error) {
+        console.warn('[WebRTC] Unable to read RTP sender parameters:', error)
+      }
+    }
   })
 
   pc.ontrack = (event) => {

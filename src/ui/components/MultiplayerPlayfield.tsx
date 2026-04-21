@@ -20,9 +20,9 @@ interface MultiplayerPlayfieldProps {
   onExit: () => void
 }
 
-const REMOTE_PADDLE_BASE_COMP_MS = 70
+const REMOTE_PADDLE_BASE_COMP_MS = 45
 const REMOTE_PADDLE_MIN_COMP_MS = 16
-const REMOTE_PADDLE_MAX_COMP_MS = 140
+const REMOTE_PADDLE_MAX_COMP_MS = 90
 const REMOTE_PADDLE_MAX_LEAD = 0.18
 
 export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
@@ -293,7 +293,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
             gameSyncService.sendBall(ballState)
           }
         }
-      }, 50) // 20 times per second
+      }, 33) // ~30 times per second
     }
 
     return () => {
