@@ -1,6 +1,10 @@
 import { TABLE, BALL, PHYSICS, PADDLE } from './constants'
 import type { BallState, Player, PaddleState } from '@/types'
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
 export class BallPhysics {
   private state: BallState
   private tableHalfLength = TABLE.LENGTH / 2
@@ -214,14 +218,20 @@ export class BallPhysics {
       const faceTilt = paddle.faceTilt ?? { x: 0, y: 0 }
       const brush = paddle.brush ?? { x: 0, y: 0 }
       const swingEnergy = Math.max(0, Math.min(1, paddle.swingEnergy ?? paddle.swipeSpeed))
+      const handHeightBias = clamp(0.5 - paddle.position.y, -0.35, 0.35)
+      const handLateralBias = clamp(paddle.position.x - 0.5, -0.45, 0.45)
       
       // Swipe speed adds extra power on top of baseline
       const swingBoost = Math.min(paddle.swipeSpeed * (player === 'player1' ? 7.5 : 6.8), 1.1)
+      const gestureSpeedBonus =
+        Math.max(0, swingEnergy - 0.2) * 0.35 +
+        Math.abs(brush.y) * 0.08 +
+        Math.abs(faceTilt.x) * 0.06
       
       // Baseline speed - consistent with original
       const baseSpeed = Math.max(incomingSpeed * 0.85, 2.4)
       const rawSpeed = Math.min(
-        baseSpeed + 0.5 + swingBoost + swingEnergy * 0.45,
+        baseSpeed + 0.5 + swingBoost + swingEnergy * 0.45 + gestureSpeedBonus,
         BALL.MAX_SPEED
       )
       const newSpeed = rawSpeed
@@ -251,15 +261,25 @@ export class BallPhysics {
           Math.abs(offsetY) * newSpeed * 0.1 +
           swingBoost * 0.12 +
           faceTilt.x * 0.5 +
-          brush.y * 0.14,
+          brush.y * 0.14 +
+          handHeightBias * 0.25,
         z: direction * newSpeed * (0.95 + swingEnergy * 0.08),
       }
 
-      const spinX = offsetX * 0.7 + aimX * 0.9 + brush.x * 0.7 + faceTilt.y * 0.5
-      const spinY = offsetY * 0.8 + brush.y * 0.9 + faceTilt.x * 0.6
+      const spinX =
+        offsetX * 0.7 +
+        aimX * 0.9 +
+        brush.x * 0.7 +
+        faceTilt.y * 0.5 +
+        handLateralBias * 0.35
+      const spinY =
+        offsetY * 0.8 +
+        brush.y * 0.9 +
+        faceTilt.x * 0.6 +
+        handHeightBias * 0.55
       this.state.spin = {
-        x: Math.max(-2.6, Math.min(2.6, spinX)),
-        y: Math.max(-2.6, Math.min(2.6, spinY)),
+        x: clamp(spinX, -2.8, 2.8),
+        y: clamp(spinY, -2.8, 2.8),
       }
 
       this.state.lastHitBy = player
