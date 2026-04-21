@@ -40,11 +40,14 @@ export type SyncMessageType =
   | 'paddle'
   | 'ball'
   | 'serve'
+  | 'serve-request'
   | 'point'
   | 'ready'
   | 'countdown'
   | 'game-start'
   | 'game-end'
+  | 'timesync-ping'
+  | 'timesync-pong'
 
 export interface PaddleSyncMessage {
   type: 'paddle'
@@ -106,11 +109,29 @@ export interface ServeRequestSyncMessage {
   timestamp: number
 }
 
+export interface TimeSyncPingMessage {
+  type: 'timesync-ping'
+  pingId: string
+  t0: number
+  timestamp: number
+}
+
+export interface TimeSyncPongMessage {
+  type: 'timesync-pong'
+  pingId: string
+  t0: number
+  t1: number
+  t2: number
+  timestamp: number
+}
+
 export type GameSyncMessage =
   | PaddleSyncMessage
   | BallSyncMessage
   | ServeSyncMessage
   | ServeRequestSyncMessage
+  | TimeSyncPingMessage
+  | TimeSyncPongMessage
   | PointSyncMessage
   | ReadySyncMessage
   | CountdownSyncMessage

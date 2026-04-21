@@ -24,9 +24,10 @@ const REMOTE_PADDLE_BASE_COMP_MS = 70
 const REMOTE_PADDLE_MIN_COMP_MS = 16
 const REMOTE_PADDLE_MAX_COMP_MS = 140
 const REMOTE_PADDLE_MAX_LEAD = 0.18
+const REMOTE_BALL_MAX_AGE_MS = 600
 const HOST_BALL_SYNC_INTERVAL_MS = 16
 const HOST_BALL_SYNC_MIN_INTERVAL_MS = 16
-const HOST_BALL_SYNC_MAX_INTERVAL_MS = 50
+const HOST_BALL_SYNC_MAX_INTERVAL_MS = 33
 
 export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -95,7 +96,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
       },
       messageTimestamp: number
     ) => {
-      const apparentAgeMs = Date.now() - messageTimestamp
+      const apparentAgeMs = gameSyncService.getRemoteMessageAgeMs(messageTimestamp, Date.now())
       const compensationMs = Math.min(
         REMOTE_PADDLE_MAX_COMP_MS,
         Math.max(
@@ -299,6 +300,7 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
     let isDisposed = false
     if (isHost) {
       let syncIntervalMs = HOST_BALL_SYNC_INTERVAL_MS
+      let consecutiveSendFailures = 0
 
       const scheduleNextSync = (delayMs: number) => {
         if (isDisposed) return
@@ -321,11 +323,17 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
         if (attemptedSend) {
           if (wasSent) {
-            syncIntervalMs = Math.max(HOST_BALL_SYNC_MIN_INTERVAL_MS, syncIntervalMs - 1)
+            consecutiveSendFailures = 0
+            syncIntervalMs = Math.max(HOST_BALL_SYNC_MIN_INTERVAL_MS, syncIntervalMs - 2)
           } else {
-            syncIntervalMs = Math.min(HOST_BALL_SYNC_MAX_INTERVAL_MS, syncIntervalMs + 4)
+            consecutiveSendFailures += 1
+            if (consecutiveSendFailures >= 2) {
+              syncIntervalMs = Math.min(HOST_BALL_SYNC_MAX_INTERVAL_MS, syncIntervalMs + 3)
+              consecutiveSendFailures = 0
+            }
           }
         } else {
+          consecutiveSendFailures = 0
           syncIntervalMs = Math.max(HOST_BALL_SYNC_MIN_INTERVAL_MS, syncIntervalMs - 1)
         }
 
@@ -395,6 +403,10 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
             if (message.seq <= lastBallSeqRef.current) {
               break
             }
+            const messageAgeMs = gameSyncService.getRemoteMessageAgeMs(message.timestamp, Date.now())
+            if (messageAgeMs > REMOTE_BALL_MAX_AGE_MS) {
+              break
+            }
             lastBallSeqRef.current = message.seq
             gameRef.current.setRemoteBallState(message.ball, performance.now())
           }
@@ -460,6 +472,17 @@ export function MultiplayerPlayfield({ onExit }: MultiplayerPlayfieldProps) {
 
     return unsubscribe
   }, [isHost, playerId, scorePoint, setPhase, setServingPlayer, resetGuestBallSync, compensateRemotePaddleLatency])
+
+  useEffect(() => {
+    if (connectionState !== 'connected') {
+      gameSyncService.stopTimeSync()
+      return
+    }
+    gameSyncService.startTimeSync(2000)
+    return () => {
+      gameSyncService.stopTimeSync()
+    }
+  }, [connectionState])
 
   // Show countdown when room state changes to countdown
   useEffect(() => {

@@ -7,6 +7,8 @@ import type {
   PointSyncMessage,
   GameStartSyncMessage,
   GameEndSyncMessage,
+  TimeSyncPingMessage,
+  TimeSyncPongMessage,
 } from './types'
 import type { PaddleState, BallState, Player } from '@/types/game'
 
@@ -19,6 +21,11 @@ export class GameSyncService {
   private isHost: boolean = false
   private ballSequence = 0
   private readonly transientBackpressureLimit = 128 * 1024
+  private timeSyncTimer: ReturnType<typeof setInterval> | null = null
+  private pendingPings = new Map<string, number>()
+  private remoteClockOffsetMs = 0
+  private estimatedRttMs = 0
+  private hasTimeSync = false
 
   setDataChannel(channel: RTCDataChannel, isHost: boolean) {
     this.setDataChannels({ transient: channel }, isHost)
@@ -58,6 +65,9 @@ export class GameSyncService {
     channel.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data) as GameSyncMessage
+        if (this.handleInternalTimeSyncMessage(message)) {
+          return
+        }
         this.messageHandlers.forEach((handler) => handler(message))
       } catch {
         // Ignore parse errors
@@ -81,6 +91,48 @@ export class GameSyncService {
 
   private isTransientMessage(message: GameSyncMessage): boolean {
     return message.type === 'ball' || message.type === 'paddle'
+  }
+
+  private handleInternalTimeSyncMessage(message: GameSyncMessage): boolean {
+    if (message.type === 'timesync-ping') {
+      const t1 = Date.now()
+      const pong: TimeSyncPongMessage = {
+        type: 'timesync-pong',
+        pingId: message.pingId,
+        t0: message.t0,
+        t1,
+        t2: Date.now(),
+        timestamp: Date.now(),
+      }
+      this.send(pong)
+      return true
+    }
+
+    if (message.type === 'timesync-pong') {
+      if (!this.pendingPings.has(message.pingId)) {
+        return true
+      }
+      this.pendingPings.delete(message.pingId)
+
+      const t3 = Date.now()
+      const rtt = Math.max(0, t3 - message.t0)
+      const offset = ((message.t1 - message.t0) + (message.t2 - t3)) / 2
+
+      this.estimatedRttMs = this.hasTimeSync
+        ? this.lerp(this.estimatedRttMs, rtt, 0.2)
+        : rtt
+      this.remoteClockOffsetMs = this.hasTimeSync
+        ? this.lerp(this.remoteClockOffsetMs, offset, 0.2)
+        : offset
+      this.hasTimeSync = true
+      return true
+    }
+
+    return false
+  }
+
+  private lerp(start: number, end: number, t: number): number {
+    return start + (end - start) * t
   }
 
   private getOpenChannel(channel: RTCDataChannel | null): RTCDataChannel | null {
@@ -142,6 +194,57 @@ export class GameSyncService {
     return this.send(message)
   }
 
+  sendTimeSyncPing() {
+    const t0 = Date.now()
+    const pingId = `${t0}-${Math.random().toString(36).slice(2, 10)}`
+    const message: TimeSyncPingMessage = {
+      type: 'timesync-ping',
+      pingId,
+      t0,
+      timestamp: t0,
+    }
+    if (this.send(message)) {
+      this.pendingPings.set(pingId, t0)
+    }
+  }
+
+  startTimeSync(intervalMs = 2000) {
+    if (this.timeSyncTimer) {
+      clearInterval(this.timeSyncTimer)
+      this.timeSyncTimer = null
+    }
+    this.sendTimeSyncPing()
+    this.timeSyncTimer = setInterval(() => {
+      this.sendTimeSyncPing()
+    }, intervalMs)
+  }
+
+  stopTimeSync() {
+    if (this.timeSyncTimer) {
+      clearInterval(this.timeSyncTimer)
+      this.timeSyncTimer = null
+    }
+    this.pendingPings.clear()
+  }
+
+  getRemoteMessageAgeMs(remoteTimestamp: number, receivedAtLocalMs = Date.now()): number {
+    if (!Number.isFinite(remoteTimestamp)) {
+      return 0
+    }
+    const adjustedRemoteLocalMs = this.hasTimeSync
+      ? remoteTimestamp - this.remoteClockOffsetMs
+      : remoteTimestamp
+    return Math.max(0, receivedAtLocalMs - adjustedRemoteLocalMs)
+  }
+
+  getTimeSyncStats() {
+    return {
+      hasSync: this.hasTimeSync,
+      clockOffsetMs: this.remoteClockOffsetMs,
+      rttMs: this.estimatedRttMs,
+    }
+  }
+
   sendServe(player: Player, seed: number) {
     const message: ServeSyncMessage = {
       type: 'serve',
@@ -197,10 +300,14 @@ export class GameSyncService {
   }
 
   close() {
+    this.stopTimeSync()
     this.transientChannel?.close()
     this.reliableChannel?.close()
     this.transientChannel = null
     this.reliableChannel = null
+    this.hasTimeSync = false
+    this.remoteClockOffsetMs = 0
+    this.estimatedRttMs = 0
     this.messageHandlers.clear()
   }
 }

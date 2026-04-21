@@ -42,8 +42,8 @@ export class PongGame {
   private readonly remoteJitterMultiplier = 2
   private readonly remoteExtrapolationMinMs = 45
   private readonly remoteExtrapolationMaxMs = 170
-  private readonly remoteSoftSnapDistance = 0.18
-  private readonly remoteHardSnapDistance = 0.36
+  private readonly remoteSoftSnapDistance = 0.24
+  private readonly remoteHardSnapDistance = 0.46
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -357,7 +357,7 @@ export class PongGame {
     const driftFromRendered = this.distanceToRenderedBall(copiedState)
     if (driftFromRendered >= this.remoteHardSnapDistance) {
       this.remoteBallFrames = [{ state: copiedState, receivedAt }]
-    } else if (driftFromRendered >= this.remoteSoftSnapDistance && this.remoteBallFrames.length > 2) {
+    } else if (driftFromRendered >= this.remoteSoftSnapDistance && this.remoteBallFrames.length > 3) {
       // Keep only the latest two frames so correction converges faster after burst loss.
       this.remoteBallFrames = this.remoteBallFrames.slice(-2)
     }
