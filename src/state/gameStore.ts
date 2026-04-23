@@ -94,6 +94,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   scorePoint: (winner) => {
     const state = get()
+    const matchAlreadyOver =
+      state.phase === 'game-over' ||
+      state.player1.score >= GAME.POINTS_TO_WIN ||
+      state.player2.score >= GAME.POINTS_TO_WIN
+    if (matchAlreadyOver) {
+      return
+    }
+
     const newScore1 = winner === 'player1' ? state.player1.score + 1 : state.player1.score
     const newScore2 = winner === 'player2' ? state.player2.score + 1 : state.player2.score
 
@@ -119,7 +127,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   setScore: (player1Score, player2Score, lastScorer) => {
     const state = get()
-    const totalPoints = player1Score + player2Score
+    const normalizedScore1 = Math.min(player1Score, GAME.POINTS_TO_WIN)
+    const normalizedScore2 = Math.min(player2Score, GAME.POINTS_TO_WIN)
+    const matchAlreadyOver =
+      state.phase === 'game-over' ||
+      state.player1.score >= GAME.POINTS_TO_WIN ||
+      state.player2.score >= GAME.POINTS_TO_WIN
+    if (matchAlreadyOver) {
+      return
+    }
+
+    const totalPoints = normalizedScore1 + normalizedScore2
     const serveSwitch = totalPoints % GAME.SERVE_SWITCH_INTERVAL === 0
     const newServer = serveSwitch
       ? state.servingPlayer === 'player1'
@@ -127,11 +145,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
         : 'player1'
       : state.servingPlayer
 
-    const gameOver = player1Score >= GAME.POINTS_TO_WIN || player2Score >= GAME.POINTS_TO_WIN
+    const gameOver =
+      normalizedScore1 >= GAME.POINTS_TO_WIN || normalizedScore2 >= GAME.POINTS_TO_WIN
 
     set({
-      player1: { ...state.player1, score: player1Score, isServing: newServer === 'player1' },
-      player2: { ...state.player2, score: player2Score, isServing: newServer === 'player2' },
+      player1: { ...state.player1, score: normalizedScore1, isServing: newServer === 'player1' },
+      player2: { ...state.player2, score: normalizedScore2, isServing: newServer === 'player2' },
       servingPlayer: newServer,
       lastScorer,
       rallyCount: 0,
