@@ -1,4 +1,5 @@
 # PongHub 🏓
+<img width="1728" height="995" alt="image" src="https://github.com/user-attachments/assets/677a6463-9728-4c7f-a150-34b10ce8554e" />
 
 Play ping pong in your browser using your hands. Point a webcam at yourself, open your palm to spawn a paddle, and swing to hit the ball. Play solo against a CPU opponent or challenge a friend over the internet with real‑time multiplayer.
 
